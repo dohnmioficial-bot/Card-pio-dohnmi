@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DOHN'MI · Diagnóstico Supabase</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#050e08;color:#e8dfc8;font-family:monospace;padding:20px;min-height:100vh}
+h1{color:#F2C12E;font-size:1.1rem;margin-bottom:20px;letter-spacing:.1em}
+.test{background:rgba(11,38,25,.7);border:1px solid rgba(242,193,46,.12);border-radius:10px;padding:14px;margin-bottom:10px}
+.test-name{font-size:.75rem;letter-spacing:.1em;color:rgba(232,223,200,.5);margin-bottom:6px}
+.test-result{font-size:.9rem;font-weight:bold}
+.ok{color:#4ade80}
+.fail{color:#f87171}
+.pending{color:#fbbf24}
+.btn{width:100%;padding:14px;background:#F2C12E;border:none;border-radius:10px;font-weight:900;font-size:.85rem;color:#050e08;cursor:pointer;letter-spacing:.1em;margin-bottom:16px}
+.detail{font-size:.68rem;color:rgba(232,223,200,.4);margin-top:4px;word-break:break-all}
+.summary{background:rgba(0,0,0,.3);border-radius:10px;padding:14px;margin-top:16px;font-size:.78rem;line-height:1.7}
+</style>
+</head>
+<body>
+<h1>⚔️ DIAGNÓSTICO IMPERIAL — SUPABASE</h1>
+<button class="btn" onclick="runAll()">▶ INICIAR DIAGNÓSTICO</button>
+
+<div class="test" id="t1"><div class="test-name">TESTE 1 · CONEXÃO COM SUPABASE</div><div class="test-result pending" id="r1">Aguardando...</div><div class="detail" id="d1"></div></div>
+<div class="test" id="t2"><div class="test-name">TESTE 2 · LEITURA DA TABELA CLIENTES</div><div class="test-result pending" id="r2">Aguardando...</div><div class="detail" id="d2"></div></div>
+<div class="test" id="t3"><div class="test-name">TESTE 3 · ESCRITA (INSERÇÃO DE TESTE)</div><div class="test-result pending" id="r3">Aguardando...</div><div class="detail" id="d3"></div></div>
+<div class="test" id="t4"><div class="test-name">TESTE 4 · LEITURA DO REGISTRO INSERIDO</div><div class="test-result pending" id="r4">Aguardando...</div><div class="detail" id="d4"></div></div>
+<div class="test" id="t5"><div class="test-name">TESTE 5 · DELEÇÃO DO REGISTRO DE TESTE</div><div class="test-result pending" id="r5">Aguardando...</div><div class="detail" id="d5"></div></div>
+<div class="test" id="t6"><div class="test-name">TESTE 6 · TOTAL DE CLIENTES REAIS</div><div class="test-result pending" id="r6">Aguardando...</div><div class="detail" id="d6"></div></div>
+
+<div class="summary" id="summary" style="display:none"></div>
+
+<script>
+const URL='https://ppnrmrnkpmzpufppdzwf.supabase.co';
+const KEY='sb_publishable_ZxPkeXTseIayHdi40I5AXQ_vpOcHgRb';
+const HEADERS={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
+const TEST_WHATS='00000000000_TESTE_DIAGNOSTICO';
+
+function set(id,cls,msg,detail=''){
+  document.getElementById('r'+id).className='test-result '+cls;
+  document.getElementById('r'+id).textContent=msg;
+  document.getElementById('d'+id).textContent=detail;
+}
+
+async function runAll(){
+  // Reset
+  for(let i=1;i<=6;i++) set(i,'pending','Testando...');
+  document.getElementById('summary').style.display='none';
+
+  let passed=0;
+  const results=[];
+
+  // T1 — Connection
+  try{
+    const r=await fetch(`${URL}/rest/v1/`,{headers:HEADERS});
+    if(r.ok||r.status===404){set(1,'ok','✓ CONEXÃO OK','Status: '+r.status);passed++;}
+    else throw new Error('Status '+r.status);
+  }catch(e){set(1,'fail','✗ FALHA NA CONEXÃO',e.message);}
+  results.push(document.getElementById('r1').classList.contains('ok'));
+
+  // T2 — Read table
+  try{
+    const r=await fetch(`${URL}/rest/v1/clientes?select=count`,{headers:{...HEADERS,'Prefer':'count=exact'}});
+    const count=r.headers.get('content-range');
+    if(r.ok){set(2,'ok','✓ TABELA ACESSÍVEL','Registros: '+(count||'desconhecido'));passed++;}
+    else{const t=await r.text();throw new Error(r.status+': '+t);}
+  }catch(e){set(2,'fail','✗ TABELA INACESSÍVEL',e.message);}
+  results.push(document.getElementById('r2').classList.contains('ok'));
+
+  // T3 — Write
+  try{
+    // Delete old test first
+    await fetch(`${URL}/rest/v1/clientes?whatsapp=eq.${TEST_WHATS}`,{method:'DELETE',headers:HEADERS});
+    const r=await fetch(`${URL}/rest/v1/clientes`,{
+      method:'POST',
+      headers:{...HEADERS,'Prefer':'return=representation'},
+      body:JSON.stringify({whatsapp:TEST_WHATS,nome:'TESTE_DIAGNOSTICO',fase:'cupom',total_pedidos:0})
+    });
+    if(r.ok||r.status===201){set(3,'ok','✓ ESCRITA OK','Registro de teste inserido');passed++;}
+    else{const t=await r.text();throw new Error(r.status+': '+t);}
+  }catch(e){set(3,'fail','✗ ESCRITA FALHOU',e.message);}
+  results.push(document.getElementById('r3').classList.contains('ok'));
+
+  // T4 — Read back
+  try{
+    const r=await fetch(`${URL}/rest/v1/clientes?whatsapp=eq.${TEST_WHATS}&select=*`,{headers:HEADERS});
+    const d=await r.json();
+    if(d&&d.length>0){set(4,'ok','✓ LEITURA OK',`Nome: ${d[0].nome} | Fase: ${d[0].fase}`);passed++;}
+    else throw new Error('Registro não encontrado após inserção');
+  }catch(e){set(4,'fail','✗ LEITURA FALHOU',e.message);}
+  results.push(document.getElementById('r4').classList.contains('ok'));
+
+  // T5 — Delete test record
+  try{
+    const r=await fetch(`${URL}/rest/v1/clientes?whatsapp=eq.${TEST_WHATS}`,{method:'DELETE',headers:HEADERS});
+    if(r.ok||r.status===204){set(5,'ok','✓ DELEÇÃO OK','Registro de teste removido');passed++;}
+    else throw new Error('Status '+r.status);
+  }catch(e){set(5,'fail','✗ DELEÇÃO FALHOU',e.message);}
+  results.push(document.getElementById('r5').classList.contains('ok'));
+
+  // T6 — Count real clients
+  try{
+    const r=await fetch(`${URL}/rest/v1/clientes?select=*`,{headers:HEADERS});
+    const d=await r.json();
+    const real=d.filter(c=>!c.whatsapp?.includes('TESTE'));
+    set(6,'ok',`✓ ${real.length} CLIENTE${real.length!==1?'S':''} REAL${real.length!==1?'S':''} NO BANCO`,
+      real.length>0?'Último: '+(real[0].nome||real[0].whatsapp):'Banco vazio — nenhum pedido registrado ainda');
+    passed++;
+  }catch(e){set(6,'fail','✗ CONTAGEM FALHOU',e.message);}
+
+  // Summary
+  const allOk=passed>=5;
+  document.getElementById('summary').style.display='block';
+  document.getElementById('summary').innerHTML=`
+    <strong style="color:${allOk?'#4ade80':'#f87171'}">${allOk?'✓ SUPABASE OPERACIONAL':'⚠️ PROBLEMAS ENCONTRADOS'}</strong><br><br>
+    ${passed}/6 testes passaram<br><br>
+    ${allOk?
+      'O banco de dados está funcionando corretamente. Os dados dos clientes serão salvos e recuperados normalmente.' :
+      'Verifique os testes com ✗ acima. Possíveis causas: RLS ativo sem políticas, chave de API incorreta, tabela não criada.'}
+    ${passed<3?'<br><br><strong style="color:#fbbf24">AÇÃO NECESSÁRIA:</strong> Execute novamente o SQL de criação da tabela no Supabase, incluindo as políticas de acesso.':''}
+  `;
+}
+</script>
+</body>
+</html>
