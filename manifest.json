@@ -1,0 +1,31 @@
+{
+  "name": "DOHN'MI · Sabores do Império",
+  "short_name": "DOHN'MI",
+  "description": "O cardápio imperial. Peça, acumule selos e suba de nível no Império.",
+  "start_url": "/Card-pio-dohnmi/",
+  "scope": "/Card-pio-dohnmi/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050e08",
+  "theme_color": "#050e08",
+  "categories": [
+    "food",
+    "shopping"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "lang": "pt-BR"
+}
