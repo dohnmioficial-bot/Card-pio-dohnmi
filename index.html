@@ -936,19 +936,32 @@ async function encaminharPedidoFinal(){
     if(b.textContent.includes('ENCAMINHAR')) b.closest('div').remove();
   });
 
+  // Garante conversa (separado — não bloqueia o pedido se falhar)
+  try{ await garantirConversa(); }catch(e){}
+
+  // Salva pedido no Supabase
   try{
-    await garantirConversa();
-    await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
+    const {id:_id,...sem}=p;
+    const payload={...sem,
+      conversa_id:omiConvId||null,
+      criado_em:new Date().toISOString(),
+      atualizado_em:new Date().toISOString()
+    };
+    const r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:(()=>{const {id:_id,...sem}=p;return JSON.stringify({...sem,conversa_id:omiConvId||null,criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()})})()
+      body:JSON.stringify(payload)
     });
-  }catch(e){console.warn('Erro ao enviar pedido',e);}
+    if(!r.ok){
+      const err=await r.text();
+      console.warn('omi_pedidos error:',r.status,err);
+    }
+  }catch(e){console.warn('Erro ao salvar pedido:',e);}
 
-  // Atualiza progresso do cliente
+  // Atualiza estado local
   if(descontoAtivo&&!descontoUsado) descontoUsado=true;
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
-  orders.unshift({id:p.id,data:new Date().toISOString(),itens:JSON.parse(p.itens),status:'recebido',pagamentoConfirmado:false,avaliado:false});
+  orders.unshift({data:new Date().toISOString(),itens:JSON.parse(p.itens||'[]'),status:'recebido',pagamentoConfirmado:false,avaliado:false});
   localStorage.setItem('dohnmi_orders',JSON.stringify(orders));
   salvar(); supaSave();
   window._omiPedidoAtual=null;
