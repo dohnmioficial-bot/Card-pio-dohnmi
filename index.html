@@ -696,7 +696,6 @@ async function finalizarPedidoOMI(){
 
   // Salva rascunho do pedido (status 'rascunho' até o cliente confirmar)
   window._omiPedidoAtual = {
-    id: orderId,
     cliente_whats: clienteWhats,
     cliente_nome: clienteNome,
     cliente_end: clienteEnd||null,
@@ -842,7 +841,7 @@ async function encaminharPedidoFinal(){
     await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({...p, criado_em:new Date().toISOString(), atualizado_em:new Date().toISOString()})
+      body:(()=>{const {id:_id,...sem}=p;return JSON.stringify({...sem,criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()})})()
     });
   }catch(e){console.warn('Erro ao enviar pedido',e);}
 
