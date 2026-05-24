@@ -915,10 +915,11 @@ async function encaminharPedidoFinal(){
   });
 
   try{
+    await garantirConversa();
     await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:(()=>{const {id:_id,...sem}=p;return JSON.stringify({...sem,criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()})})()
+      body:(()=>{const {id:_id,...sem}=p;return JSON.stringify({...sem,conversa_id:omiConvId||null,criado_em:new Date().toISOString(),atualizado_em:new Date().toISOString()})})()
     });
   }catch(e){console.warn('Erro ao enviar pedido',e);}
 
@@ -1023,6 +1024,88 @@ ${buildOMIContext()}
 REGRAS: Nunca invente preços. Se o cidadão quiser fazer um pedido, oriente-o a usar os itens na tela. Termine sempre com ||expr:VALOR|| onde VALOR é: feliz, atento, pensando ou surpreso.`;
 }
 
+// ── SYNC CLIENTE DO SUPABASE ──────────────────────────────
+async function syncClienteSupabase(){
+  if(!clienteWhats) return;
+  try{
+    const r=await fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}&select=*`,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    if(!r.ok) return;
+    const lista=await r.json();
+    if(!lista.length) return;
+    const d=lista[0];
+    const totalAntes=totalPedidosPagos;
+    // Atualiza variáveis locais com dados do Supabase
+    totalPedidosPagos=d.total_pedidos||0;
+    cromiAcumulado=d.cromi_acumulado||0;
+    selosPedidos=JSON.parse(d.selos||'{}');
+    membroCoroa=d.membro_coroa||false;
+    premioHamburguerPendente=d.premio_hamburguer||false;
+    premioComboPendente=d.premio_combo||false;
+    descontoUsado=d.desconto_usado||false;
+    if(d.nome) clienteNome=d.nome;
+    if(d.endereco) clienteEnd=d.endereco;
+    fase=d.fase||fase;
+    salvar();
+    // Se houve novo pedido confirmado, re-renderiza
+    if(totalPedidosPagos>totalAntes){
+      renderCardContent();
+      updateBagBar();
+    }
+  }catch(e){}
+}
+
+// ── POLLING O-MI CHAT (mensagens + sync) ──────────────────
+let omiPollTimer=null;
+let omiConvId=null;
+let omiUltimaMsgCount=0;
+
+async function omiPollMensagens(){
+  if(!omiConvId||!clienteWhats) return;
+  try{
+    const r=await fetch(`${SUPA_URL}/rest/v1/omi_mensagens?conversa_id=eq.${omiConvId}&order=criado_em.asc`,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    if(!r.ok) return;
+    const msgs=await r.json();
+    if(msgs.length>omiUltimaMsgCount){
+      omiUltimaMsgCount=msgs.length;
+      // Adiciona mensagens novas do admin ao chat
+      const novas=msgs.filter(m=>m.autor==='admin'||m.autor==='omi');
+      novas.forEach(m=>{
+        const jaExiste=omiChatMessages.some(cm=>cm._id===m.id);
+        if(!jaExiste&&m.conteudo){
+          omiChatMessages.push({role:'assistant',content:m.conteudo,expr:'atento',_id:m.id});
+        }
+      });
+      renderOMIChatMessages();
+      // Sync cliente para atualizar selos
+      await syncClienteSupabase();
+    }
+  }catch(e){}
+}
+
+async function garantirConversa(){
+  if(omiConvId||!clienteWhats) return;
+  try{
+    // Busca conversa existente
+    const r=await fetch(`${SUPA_URL}/rest/v1/omi_conversas?cliente_whats=eq.${encodeURIComponent(clienteWhats)}&select=id`,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    const lista=await r.json();
+    if(lista.length){omiConvId=lista[0].id;return;}
+    // Cria nova conversa
+    const r2=await fetch(`${SUPA_URL}/rest/v1/omi_conversas`,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({cliente_whats:clienteWhats,cliente_nome:clienteNome,ultima_msg:'',nao_lidas:0})
+    });
+    const nova=await r2.json();
+    if(nova&&nova[0]) omiConvId=nova[0].id;
+  }catch(e){}
+}
+
 function openOMIChat() {
   const modal = document.getElementById('omiChatModal');
   modal.classList.add('open');
@@ -1055,6 +1138,7 @@ function openOMIChat() {
 
 function closeOMIChat() {
   document.getElementById('omiChatModal').classList.remove('open');
+  if(omiPollTimer){clearInterval(omiPollTimer);omiPollTimer=null;}
 }
 
 function renderOMIChatMessages() {
