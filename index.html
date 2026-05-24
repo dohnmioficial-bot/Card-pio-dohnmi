@@ -561,6 +561,25 @@ let _tt;function showToast(msg){clearTimeout(_tt);const t=document.getElementByI
 function getTaxaEntrega(){return membroCoroa?0:1.99}
 function getDescontoAutomatico(){
  const sub=getBagSubtotal();
+
+ // Auto-corrige prêmios que ficaram travados
+ // Hambúrguer grátis = válido APENAS no 8º pedido (após 7º confirmado)
+ // Se totalPedidosPagos já passou de 8, o prêmio expirou
+ if(premioHamburguerPendente&&totalPedidosPagos>=8){
+   premioHamburguerPendente=false;salvar();
+   fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+     method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+     body:JSON.stringify({premio_hamburguer:false})
+   }).catch(()=>{});
+ }
+ if(premioComboPendente&&totalPedidosPagos>=13){
+   premioComboPendente=false;salvar();
+   fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+     method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+     body:JSON.stringify({premio_combo:false})
+   }).catch(()=>{});
+ }
+
  if(membroCoroa){let d=0;if(cromiAcumulado>=11.90)d+=11.90;if(clienteAniv){const pts=clienteAniv.split('/');if(pts.length===2){const di=parseInt(pts[0]),me=parseInt(pts[1]),hj=new Date();if(hj.getDate()===di&&hj.getMonth()+1===me)d+=11.90;}}return Math.min(d,sub);}
  let d=0;const p=totalPedidosPagos+1;
  const proj=cromiAcumulado+([1,2,3,4,8,9,10].includes(p)?1.49:0);
@@ -964,11 +983,24 @@ async function encaminharPedidoFinal(){
     }
   }catch(e){console.warn('Erro ao salvar pedido:',e);}
 
-  // Atualiza estado local
+  // Atualiza estado local + zera prêmios usados no Supabase
   const descAuto=getDescontoAutomatico();
   if(descontoAtivo&&!descontoUsado) descontoUsado=true;
-  if(premioHamburguerPendente&&descAuto>0) premioHamburguerPendente=false;
-  if(premioComboPendente&&descAuto>0) premioComboPendente=false;
+  const usouHamb=premioHamburguerPendente&&descAuto>0;
+  const usouCombo=premioComboPendente&&descAuto>0;
+  if(usouHamb) premioHamburguerPendente=false;
+  if(usouCombo) premioComboPendente=false;
+  // Zera no Supabase também
+  if((usouHamb||usouCombo)&&clienteWhats){
+    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        premio_hamburguer: usouHamb?false:premioHamburguerPendente,
+        premio_combo: usouCombo?false:premioComboPendente
+      })
+    }).catch(()=>{});
+  }
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
   orders.unshift({data:new Date().toISOString(),itens:JSON.parse(p.itens||'[]'),status:'recebido',pagamentoConfirmado:false,avaliado:false});
   localStorage.setItem('dohnmi_orders',JSON.stringify(orders));
@@ -1117,8 +1149,15 @@ async function syncClienteSupabase(){
     cromiAcumulado=d.cromi_acumulado||0;
     selosPedidos=JSON.parse(d.selos||'{}');
     membroCoroa=d.membro_coroa||false;
-    premioHamburguerPendente=d.premio_hamburguer||false;
-    premioComboPendente=d.premio_combo||false;
+    // Prêmios: só válidos na janela correta de pedidos
+    const hamb=d.premio_hamburguer||false;
+    const combo=d.premio_combo||false;
+    const tot=d.total_pedidos||0;
+    premioHamburguerPendente=hamb&&tot<8;
+    premioComboPendente=combo&&tot<13;
+    // Corrige no Supabase se estava errado
+    if(hamb&&tot>=8) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
+    if(combo&&tot>=13) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
     descontoUsado=d.desconto_usado||false;
     if(d.nome) clienteNome=d.nome;
     if(d.endereco) clienteEnd=d.endereco;
