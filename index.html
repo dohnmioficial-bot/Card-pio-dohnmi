@@ -990,6 +990,14 @@ async function encaminharPedidoFinal(){
   const usouCombo=premioComboPendente&&descAuto>0;
   if(usouHamb) premioHamburguerPendente=false;
   if(usouCombo) premioComboPendente=false;
+
+  // Zera CROMI quando cashback foi aplicado
+  const pNum=totalPedidosPagos+1;
+  const proj=cromiAcumulado+([1,2,3,4,8,9,10].includes(pNum)?1.49:0);
+  const cashbackUsado=(pNum===4&&proj>=5.96)||(pNum===10&&proj>=4.47)||(membroCoroa&&cromiAcumulado>=11.90);
+  if(cashbackUsado){
+    cromiAcumulado=0;
+  }
   // Zera no Supabase também
   if((usouHamb||usouCombo)&&clienteWhats){
     fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
@@ -1158,6 +1166,11 @@ async function syncClienteSupabase(){
     // Corrige no Supabase se estava errado
     if(hamb&&tot>=8) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
     if(combo&&tot>=13) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
+    // Segurança: CROMI Membro nunca passa de R$11,90
+    if(d.membro_coroa&&cromiAcumulado>11.90){
+      cromiAcumulado=11.90;
+      fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({cromi_acumulado:11.90})}).catch(()=>{});
+    }
     descontoUsado=d.desconto_usado||false;
     if(d.nome) clienteNome=d.nome;
     if(d.endereco) clienteEnd=d.endereco;
