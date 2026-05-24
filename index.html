@@ -755,7 +755,8 @@ async function finalizarPedidoOMI(){
     const lbl = premioHamburguerPendente?'Hambúrguer grátis':premioComboPendente?'Combo grátis':'Cashback';
     valoresLinha += `${lbl}: −${fmtVal(descAuto)}\n`;
   }
-  if(!membroCoroa) valoresLinha += `Taxa de entrega: R$ 1,99\n`;
+  if(membroCoroa) valoresLinha += `Entrega Grátis 🛵\n`;
+  else valoresLinha += `Taxa de entrega: R$ 1,99\n`;
   valoresLinha += `Total: ${fmtVal(total)}`;
 
   const enderecoLinha = clienteEnd
@@ -1049,6 +1050,11 @@ ${temDesc||descAuto>0?`💰 Subtotal: R$${sub.toFixed(2).replace('.',',')}\n${te
 
 *Total: ${fmtVal(total)}*`;const snap=items.map(i=>{return{id:i.id,nome:i.nome,qty:i.qty,preco:i.preco}});const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');orders.unshift({id:orderId,data:new Date().toISOString(),itens:snap,status:'recebido',pagamentoConfirmado:false,avaliado:false});localStorage.setItem('dohnmi_orders',JSON.stringify(orders));if(temDesc)descontoUsado=true;if(membroCoroa&&cromiAcumulado>=11.90)cromiAcumulado-=11.90;salvar();window.open(`https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`,'_blank');supaSave();clearBag();fecharDrawer();exibirTracking(orderId);showToast(`Pedido ${orderId} enviado! `);}
 function exibirTracking(orderId){const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');const order=orders.find(o=>o.id===orderId);if(!order)return;document.getElementById('trackingOrderId').textContent=` ${order.id}`;const etapas=[{key:'recebido',label:' Pedido recebido'},{key:'preparando',label:' Em preparação'},{key:'saiu_entrega',label:' Saiu para entrega'},{key:'entregue',label:' Entregue'}];const idx=Math.max(0,etapas.findIndex(e=>e.key===order.status));document.getElementById('trackingSteps').innerHTML=etapas.map((e,i)=>`<div class="tstep ${i<=idx?'active':''}"><div class="tstep-icon">${i<=idx?'✓':'○'}</div><div class="tstep-label">${e.label}</div></div>`).join('');const btn=document.getElementById('confirmarPagamentoBtn');btn.textContent=order.pagamentoConfirmado?'✓ Confirmado':' Confirmar Pagamento';btn.style.opacity=order.pagamentoConfirmado?'.5':'1';btn.onclick=order.pagamentoConfirmado?null:()=>confirmarPagamento(orderId);document.getElementById('trackingModal').classList.add('show');}
+
+// ── BACKGROUND SYNC (atualiza selos/CROMI a cada 30s) ──────────────────
+setInterval(()=>{
+  if(clienteWhats&&document.visibilityState==='visible') syncClienteSupabase();
+},30000);
 
 // ─── O-MI CHAT ENGINE ─────────────────────────────────────────────────────
 let omiChatMessages = [];
