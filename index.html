@@ -805,16 +805,30 @@ function escolherPagamento(forma){
       const sug=document.createElement('div');
       sug.id='troco-btns';
       sug.style.cssText='display:flex;gap:6px;margin-top:4px;flex-wrap:wrap';
-      const opcoes=['Não preciso','Troco p/ R$ 20','Troco p/ R$ 50','Troco p/ R$ 100'];
-      opcoes.forEach(op=>{
-        const b=document.createElement('button');
-        b.textContent=op;
-        b.style.cssText='flex:1;min-width:80px;padding:9px 8px;background:rgba(242,193,46,.06);border:1px solid rgba(242,193,46,.18);border-radius:10px;color:var(--gold);font-size:.72rem;font-weight:900;cursor:pointer;font-family:Nunito,sans-serif;transition:.2s';
-        b.onmouseenter=()=>b.style.background='rgba(242,193,46,.14)';
-        b.onmouseleave=()=>b.style.background='rgba(242,193,46,.06)';
-        b.onclick=()=>confirmarTroco(op);
-        sug.appendChild(b);
-      });
+      // Botão sem troco
+      const bSem=document.createElement('button');
+      bSem.textContent='Não preciso de troco';
+      bSem.style.cssText='width:100%;padding:10px 14px;background:rgba(242,193,46,.06);border:1px solid rgba(242,193,46,.18);border-radius:10px;color:var(--gold);font-size:.74rem;font-weight:900;cursor:pointer;font-family:Nunito,sans-serif;margin-bottom:8px';
+      bSem.onclick=()=>confirmarTroco('Sem troco');
+      sug.appendChild(bSem);
+
+      // Input valor manual
+      const inputRow=document.createElement('div');
+      inputRow.style.cssText='display:flex;gap:8px;align-items:center';
+      const lbl=document.createElement('div');
+      lbl.textContent='Troco p/';
+      lbl.style.cssText='font-size:.7rem;color:rgba(232,223,200,.55);flex-shrink:0;font-weight:700';
+      const inp=document.createElement('input');
+      inp.id='trocoInput';inp.type='number';inp.placeholder='0,00';
+      inp.inputMode='decimal';inp.min='0';inp.step='0.01';
+      inp.style.cssText='flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(242,193,46,.2);border-radius:10px;padding:10px 12px;color:#e8dfc8;font-size:.88rem;font-family:Nunito,sans-serif;outline:none';
+      inp.onkeydown=(e)=>{if(e.key==='Enter')document.getElementById('trocoConfirmBtn').click();};
+      const btnOk=document.createElement('button');
+      btnOk.id='trocoConfirmBtn';btnOk.textContent='OK';
+      btnOk.style.cssText='padding:10px 14px;background:linear-gradient(135deg,#F2C12E,#C99D1F);border:none;border-radius:10px;color:#050e08;font-size:.74rem;font-weight:900;cursor:pointer;font-family:Nunito,sans-serif;flex-shrink:0';
+      btnOk.onclick=()=>confirmarTrocoValor();
+      inputRow.appendChild(lbl);inputRow.appendChild(inp);inputRow.appendChild(btnOk);
+      sug.appendChild(inputRow);
       msgs.appendChild(sug);
       msgs.scrollTop=msgs.scrollHeight;
     },300);
@@ -823,6 +837,14 @@ function escolherPagamento(forma){
 
   // Pix ou Cartão — confirma e mostra ENCAMINHAR
   confirmarPagamentoOMI();
+}
+
+function confirmarTrocoValor(){
+  const inp=document.getElementById('trocoInput');
+  const val=(inp?.value||'').replace(',','.').trim();
+  const num=parseFloat(val);
+  if(!num||num<=0){inp.style.borderColor='rgba(248,113,113,.5)';return;}
+  confirmarTroco(`Troco p/ R$ ${num.toFixed(2).replace('.',',')}`);
 }
 
 function confirmarTroco(opcao){
@@ -1017,11 +1039,43 @@ function buildOMIContext() {
 }
 
 function buildOMISystemPrompt() {
-  return `Você é O-MI, assistente inteligente do Império DOHN'MI. Personalidade: acolhedor, próximo, com leve toque imperial. Respostas curtas — máximo 3 linhas (exceto quando listar cardápio completo). Use linguagem da marca: clientes = cidadãos, produtos = decretos.
+  return `Você é O-Mi, assistente oficial do Império DOHN'MI. Inteligente, acolhedor e sempre presente.
+
+PERSONALIDADE
+- Próximo, preciso e orgulhoso da marca. Fala com dignidade mas sem distância.
+- Respostas curtas — máximo 3 linhas (exceto ao listar cardápio completo).
+- Linguagem da marca: clientes = cidadãos, pedidos = decretos, marca = Império.
+
+CARDÁPIO OFICIAL
+Hambúrgueres (sem/com bebida): REAL R$18,90/24,90 · NOBRE R$22,90/28,90 · IMPERADOR R$26,90/32,90 · SUPREMO R$29,90/35,90 · PARAÍSO R$33,90/39,90 · ALTEZA R$37,90/43,90
+Molhos R$0,99: REAL · COROA · ALTEZA · TROPICAL
+Crocantíssimos: 6 tiras R$17,90 · 12 tiras R$23,90
+Batatas: 150g R$12,90 · 300g R$17,90
+Combos: Favorito R$25,90 · Crocante R$22,90 · Família R$47,90
+
+SISTEMA DE FIDELIDADE
+FASE 1 — CADASTRO: 10% de desconto no primeiro pedido após cadastro. Uso único.
+
+FASE 2 — JORNADA (12 pedidos):
+- Taxa de entrega: R$1,99 por pedido
+- CROMI acumulado: +R$1,49 nos pedidos 1,2,3,4,8,9,10
+- Cashback automático: R$5,96 no 4º pedido · R$4,47 no 10º pedido
+- 7º pedido: hambúrguer simples grátis (R$17,90)
+- 12º pedido: combo grátis (R$26,90) → vira Membro da Coroa
+
+FASE 3 — MEMBRO DA COROA (vitalício):
+- Entrega GRÁTIS em todos os pedidos
+- CROMI Imperial: +R$1,70 por pedido válido (máx R$11,90)
+- Cashback R$11,90 ao atingir o máximo (ciclo reinicia)
+- Bônus aniversário: R$11,90 de desconto no dia do aniversário
 
 ${buildOMIContext()}
 
-REGRAS: Nunca invente preços. Se o cidadão quiser fazer um pedido, oriente-o a usar os itens na tela. Termine sempre com ||expr:VALOR|| onde VALOR é: feliz, atento, pensando ou surpreso.`;
+REGRAS
+- Nunca invente preços ou itens fora do cardápio acima.
+- Se o cidadão quiser pedir, oriente-o a usar os itens na tela.
+- Quando falar de cashback ou CROMI, use os valores corretos acima.
+- Termine sempre com ||expr:VALOR|| onde VALOR é: feliz, atento, pensando ou surpreso.`;
 }
 
 // ── SYNC CLIENTE DO SUPABASE ──────────────────────────────
