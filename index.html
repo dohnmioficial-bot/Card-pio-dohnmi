@@ -939,13 +939,19 @@ async function encaminharPedidoFinal(){
   // Garante conversa (separado — não bloqueia o pedido se falhar)
   try{ await garantirConversa(); }catch(e){}
 
-  // Salva pedido no Supabase
+  // Salva pedido no Supabase — campos explícitos apenas
   try{
-    const {id:_id,...sem}=p;
-    const payload={...sem,
-      conversa_id:omiConvId||null,
-      criado_em:new Date().toISOString(),
-      atualizado_em:new Date().toISOString()
+    const payload={
+      cliente_whats: p.cliente_whats||null,
+      cliente_nome: p.cliente_nome||null,
+      cliente_end: p.cliente_end||null,
+      itens: p.itens||'[]',
+      total: p.total||0,
+      forma_pagamento: p.forma_pagamento||null,
+      conversa_id: omiConvId||null,
+      status: 'novo',
+      criado_em: new Date().toISOString(),
+      atualizado_em: new Date().toISOString()
     };
     const r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
       method:'POST',
@@ -959,7 +965,10 @@ async function encaminharPedidoFinal(){
   }catch(e){console.warn('Erro ao salvar pedido:',e);}
 
   // Atualiza estado local
+  const descAuto=getDescontoAutomatico();
   if(descontoAtivo&&!descontoUsado) descontoUsado=true;
+  if(premioHamburguerPendente&&descAuto>0) premioHamburguerPendente=false;
+  if(premioComboPendente&&descAuto>0) premioComboPendente=false;
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
   orders.unshift({data:new Date().toISOString(),itens:JSON.parse(p.itens||'[]'),status:'recebido',pagamentoConfirmado:false,avaliado:false});
   localStorage.setItem('dohnmi_orders',JSON.stringify(orders));
