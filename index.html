@@ -580,7 +580,20 @@ function getDescontoAutomatico(){
    }).catch(()=>{});
  }
 
- if(membroCoroa){let d=0;if(cromiAcumulado>=11.90)d+=11.90;if(clienteAniv){const pts=clienteAniv.split('/');if(pts.length===2){const di=parseInt(pts[0]),me=parseInt(pts[1]),hj=new Date();if(hj.getDate()===di&&hj.getMonth()+1===me)d+=11.90;}}return Math.min(d,sub);}
+ if(membroCoroa){
+   let d=0;
+   // Verifica data especial (CROMI aplicado SEM zerar)
+   const hj=new Date(),dia=hj.getDate(),mes=hj.getMonth()+1,dow=hj.getDay();
+   let dataEsp=false;
+   if(dia===12&&mes===10)dataEsp=true; // Crianças
+   if(dia===12&&mes===6)dataEsp=true;  // Namorados
+   if(mes===5&&dow===0){let cnt=0;for(let i=1;i<=dia;i++){if(new Date(hj.getFullYear(),4,i).getDay()===0)cnt++;}if(cnt===2)dataEsp=true;} // Mães
+   if(mes===8&&dow===0){let cnt=0;for(let i=1;i<=dia;i++){if(new Date(hj.getFullYear(),7,i).getDay()===0)cnt++;}if(cnt===2)dataEsp=true;} // Pais
+   if(dataEsp&&cromiAcumulado>0)d+=cromiAcumulado; // não zera
+   else if(clienteAniv){const pts=clienteAniv.split('/');if(pts.length===2){const di=parseInt(pts[0]),me=parseInt(pts[1]);if(hj.getDate()===di&&hj.getMonth()+1===me)d+=11.90;}} // aniversário não zera
+   else if(cromiAcumulado>=11.90)d+=11.90; // cashback normal — ZERA
+   return Math.min(d,sub);
+ }
  let d=0;const p=totalPedidosPagos+1;
  const proj=cromiAcumulado+([1,2,3,4,8,9,10].includes(p)?1.49:0);
  if(p===4&&proj>=5.96)d+=5.96;else if(p===10&&proj>=4.47)d+=4.47;
@@ -1014,13 +1027,13 @@ async function encaminharPedidoFinal(){
   orders.unshift({data:new Date().toISOString(),itens:JSON.parse(p.itens||'[]'),status:'recebido',pagamentoConfirmado:false,avaliado:false});
   localStorage.setItem('dohnmi_orders',JSON.stringify(orders));
   salvar(); supaSave();
-  window._omiPedidoAtual=null;
+  window._omiPedidoAtual=null; limparOMIChat();
 
   // Confirmação final do O-Mi
   const nome1=clienteNome.split(' ')[0];
   omiChatMessages.push({
     role:'assistant',
-    content:`Pedido encaminhado! 🚀\n\nA cozinha já recebeu, ${nome1}. Assim que confirmarmos eu te aviso aqui mesmo. Pode ficar tranquilo. 👑`,
+    content:`Pedido encaminhado! 🚀\n\nA cozinha já recebeu, ${nome1}. Assim que confirmarmos eu te aviso aqui mesmo. Pode ficar tranquila. 👑`,
     expr:'feliz'
   });
   renderOMIChatMessages();
@@ -1058,6 +1071,9 @@ setInterval(()=>{
 
 // ─── O-MI CHAT ENGINE ─────────────────────────────────────────────────────
 let omiChatMessages = [];
+function salvarOMIChat(){try{localStorage.setItem('omi_chat_v3',JSON.stringify(omiChatMessages));}catch(e){}}
+function carregarOMIChat(){try{const h=JSON.parse(localStorage.getItem('omi_chat_v3')||'[]');if(Array.isArray(h)&&h.length>0)omiChatMessages=h;}catch(e){}}
+function limparOMIChat(){omiChatMessages=[];localStorage.removeItem('omi_chat_v3');}
 let omiChatLoading = false;
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
 
@@ -1079,7 +1095,7 @@ function buildOMIContext() {
   const nomeFav = {real:"DOHN'MI REAL",nobre:"DOHN'MI NOBRE",imperador:"DOHN'MI IMPERADOR",
     supremo:"DOHN'MI SUPREMO",paraiso:"DOHN'MI PARAÍSO",alteza:"DOHN'MI ALTEZA"};
 
-  let ctx = `CARDÁPIO OFICIAL DOHN'MI\nHAMBÚRGUERES (sem/com bebida): REAL R$18,90/24,90 · NOBRE R$22,90/28,90 · IMPERADOR R$26,90/32,90 · SUPREMO R$29,90/35,90 · PARAÍSO R$33,90/39,90 · ALTEZA R$37,90/43,90\nMOLHOS R$0,99: REAL·COROA·ALTEZA·TROPICAL\nCROCANTÍSSIMOS: 6tiras R$17,90 · 12tiras R$23,90\nBATATAS: 150g R$12,90 · 300g R$17,90\nCOMBOS: Favorito R$25,90 · Crocante R$22,90 · Família R$47,90\n\n`;
+  let ctx = `CARDÁPIO OFICIAL DOHN'MI\nHAMBÚRGUERES (todos Simples R$17,90 / Duplo R$23,90): REAL · NOBRE · IMPERADOR · SUPREMO · PARAÍSO · ALTEZA\nMOLHOS R$0,99 (50ml): REAL·COROA·ALTEZA·TROPICAL\nCROCANTÍSSIMOS: 6 tiras R$17,90 · 12 tiras R$23,90\nBATATAS: 150g R$12,90 · 300g R$17,90\nCOMBOS: SOBERANO R$26,90 · MONARCA R$39,90 · IMPÉRIO R$49,90 · DAME R$22,90\n\n`;
 
   if (nome1) {
     ctx += `CIDADÃO IDENTIFICADO:\n- Nome: ${nome1}\n- Total de pedidos: ${totalPedidosPagos}\n- CROMI acumulado: R$ ${cromiAcumulado.toFixed(2)}\n- Selos: ${selosAtivos}/7\n- Status: ${membroCoroa ? 'MEMBRO DA COROA 👑' : `${7-selosAtivos} selos para hambúrguer grátis`}\n`;
@@ -1117,8 +1133,10 @@ PERSONALIDADE
 CARDÁPIO OFICIAL
 Hambúrgueres (sem/com bebida): REAL R$18,90/24,90 · NOBRE R$22,90/28,90 · IMPERADOR R$26,90/32,90 · SUPREMO R$29,90/35,90 · PARAÍSO R$33,90/39,90 · ALTEZA R$37,90/43,90
 Molhos R$0,99: REAL · COROA · ALTEZA · TROPICAL
+Hambúrgueres (todos Simples R$17,90 / Duplo R$23,90): REAL·NOBRE·IMPERADOR·SUPREMO·PARAÍSO·ALTEZA
 Crocantíssimos: 6 tiras R$17,90 · 12 tiras R$23,90
 Batatas: 150g R$12,90 · 300g R$17,90
+Combos: SOBERANO R$26,90 · MONARCA R$39,90 · IMPÉRIO R$49,90 · DAME R$22,90
 Combos: Favorito R$25,90 · Crocante R$22,90 · Família R$47,90
 
 SISTEMA DE FIDELIDADE
@@ -1241,6 +1259,7 @@ async function garantirConversa(){
 }
 
 function openOMIChat() {
+  carregarOMIChat();
   const modal = document.getElementById('omiChatModal');
   modal.classList.add('open');
 
@@ -1578,8 +1597,16 @@ async function confirmarRetornoCodigo(){
     clienteEnd=d.endereco||'';fase=d.fase||'jornada';
     totalPedidosPagos=d.total_pedidos||0;cromiAcumulado=d.cromi_acumulado||0;
     selosPedidos=JSON.parse(d.selos||'{}');descontoAtivo=!d.desconto_usado;
-    descontoUsado=d.desconto_usado||false;premioHamburguerPendente=d.premio_hamburguer||false;
-    premioComboPendente=d.premio_combo||false;membroCoroa=d.membro_coroa||false;
+    descontoUsado=d.desconto_usado||false;const hamb=d.premio_hamburguer||false;
+    const combo=d.premio_combo||false;
+    const tot=d.total_pedidos||0;
+    premioHamburguerPendente=hamb&&tot>=6&&tot<8;
+    premioComboPendente=combo&&tot>=11&&tot<13;
+    // Auto-corrige prêmios com janela errada no Supabase
+    if(hamb&&tot>=8)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
+    if(combo&&tot>=13)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
+    // Segurança: CROMI Membro nunca passa de R$11,90
+    if(d.membro_coroa&&(d.cromi_acumulado||0)>11.90)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({cromi_acumulado:11.90})}).catch(()=>{});membroCoroa=d.membro_coroa||false;
     salvar();showToast('👑 Bem-vindo de volta, '+clienteNome.split(' ')[0]+'!');
     setTimeout(()=>{renderCardContent();updateBagBar();},800);
   }catch(e){
@@ -1679,6 +1706,9 @@ function init(){carregar();
   }
   renderCardContent();renderBurgers();renderSimpleGrid('crocGrid',croc,'rc');renderSimpleGrid('porcoesGrid',porcoes,'rc');renderSimpleGrid('molhosGrid',molhos,'molho');renderSimpleGrid('combosGrid',combos,'combo');updateBagBar();}
 init();
+
+// Background sync
+setInterval(()=>{if(clienteWhats&&document.visibilityState==='visible')supaLoadCliente();},30000);
 </script>
 
 <div class="pwa-banner" id="pwaBanner" style="display:none">
