@@ -429,6 +429,7 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 
 const SUPA_URL='https://ppnrmrnkpmzpufppdzwf.supabase.co';
 const SUPA_KEY='sb_publishable_ZxPkeXTseIayHdi40I5AXQ_vpOcHgRb';
+const H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
 
 // ── SUPABASE SYNC ──────────────────────────────────────
 async function supaLoad(whats){
@@ -1261,7 +1262,7 @@ function iniciarPollPedido(orderId){
   omiActiveOrderId=orderId;
   mostrarTrackingBubble('novo');
   if(omiPollTimer) clearInterval(omiPollTimer);
-  omiPollTimer=setInterval(async()=>{
+  async function _tickPoll(){
     if(!omiActiveOrderId) return;
     try{
       const r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos?id=eq.${omiActiveOrderId}&select=id,status`,{headers:H});
@@ -1271,13 +1272,11 @@ function iniciarPollPedido(orderId){
       if(novoStatus!==omiActiveOrderStatus){
         omiActiveOrderStatus=novoStatus;
         mostrarTrackingBubble(novoStatus);
-        // Notifica no chat
         const msgStatus=OMI_STATUS_MSGS[novoStatus]||'';
         omiChatMessages.push({role:'assistant',content:msgStatus,expr:novoStatus==='entregue'?'feliz':'atento'});
         salvarOMIChat();
         if(novoStatus==='entregue'){
           clearInterval(omiPollTimer);omiPollTimer=null;
-          // Sync selos e fecha bubble após 5s
           setTimeout(()=>{
             supaLoadCliente();
             setTimeout(()=>esconderTrackingBubble(),5000);
@@ -1285,7 +1284,8 @@ function iniciarPollPedido(orderId){
         }
       }
     }catch(e){}
-  },5000);
+  }
+  omiPollTimer=setInterval(function(){_tickPoll();},5000);
 }
 let omiUltimaMsgCount=0;
 
