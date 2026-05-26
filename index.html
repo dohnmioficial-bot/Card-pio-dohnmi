@@ -1192,7 +1192,7 @@ async function syncClienteSupabase(){
     const totalAntes=totalPedidosPagos;
     // Atualiza variáveis locais com dados do Supabase
     totalPedidosPagos=d.total_pedidos||0;
-    cromiAcumulado=d.cromi_acumulado||0;
+    cromiAcumulado=d.cromi_acumulado!=null?d.cromi_acumulado:0;
     selosPedidos=JSON.parse(d.selos||'{}');
     membroCoroa=d.membro_coroa||false;
     // Prêmios: só válidos na janela correta de pedidos
@@ -1787,7 +1787,7 @@ function init(){carregar();
       if(!d) return;
       fase=d.fase||fase;
       totalPedidosPagos=d.total_pedidos||totalPedidosPagos;
-      cromiAcumulado=d.cromi_acumulado||cromiAcumulado;
+      cromiAcumulado=d.cromi_acumulado!=null?d.cromi_acumulado:cromiAcumulado;
       selosPedidos=JSON.parse(d.selos||'{}');
       desconto=d.desconto_usado||desconto;
       premioHamburguerPendente=d.premio_hamburguer||premioHamburguerPendente;
