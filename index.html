@@ -829,6 +829,10 @@ ${valoresLinha}
 
 Como vai preferir pagar?`;
 
+  // Sincroniza CROMI do Supabase antes de montar o pedido (garante cashback atualizado)
+  if(clienteWhats){
+    try{ await syncClienteSupabase(); }catch(e){}
+  }
   limparOMIChat(); // limpa histórico antigo
   omiChatMessages=[{role:'assistant', content:msgResumo, expr: totalPedidosPagos===0?'feliz':'atento'}];
   salvarOMIChat(); // salva novo review antes de abrir
@@ -1025,6 +1029,7 @@ async function encaminharPedidoFinal(){
       itens: p.itens||'[]',
       total: p.total||0,
       forma_pagamento: p.forma_pagamento||null,
+      troco: p.troco||null,
       conversa_id: omiConvId||null,
       status: 'novo',
       criado_em: new Date().toISOString(),
@@ -1100,10 +1105,10 @@ async function encaminharPedidoFinal(){
     content:`Pedido encaminhado! 🚀\n\nA cozinha já recebeu, ${nome1}. Assim que confirmarmos eu te aviso aqui mesmo. 👑`,
     expr:'feliz'
   });
-  // Card de tracking dentro do chat
+  // Card de tracking dentro do chat (role:'assistant' para não quebrar API filter)
   if(omiOrderSnapshot){
     omiChatMessages.push({
-      role:'system',type:'tracking',status:'novo',
+      role:'assistant',type:'tracking',status:'novo',content:'__tracking__',
       itens:omiOrderSnapshot.itens,total:omiOrderSnapshot.total
     });
   }
@@ -1376,10 +1381,17 @@ function iniciarPollPedido(orderId){
         const msgStatus=OMI_STATUS_MSGS[novoStatus]||'';
         // Atualiza card de tracking no chat
         const _tm=omiChatMessages.find(m=>m.type==='tracking');
-        if(_tm){_tm.status=novoStatus;}
-        else{omiChatMessages.push({role:'assistant',content:msgStatus,expr:novoStatus==='entregue'?'feliz':'atento'});}
+        if(_tm){
+          _tm.status=novoStatus;
+        } else {
+          // Se não há card, adiciona mensagem de texto
+          omiChatMessages.push({role:'assistant',content:msgStatus,expr:novoStatus==='entregue'?'feliz':'atento'});
+        }
         salvarOMIChat();
-        renderOMIChatMessages();
+        // Re-renderiza apenas se o chat está aberto
+        if(document.getElementById('omiChatModal')?.classList.contains('open')){
+          renderOMIChatMessages();
+        }
         if(novoStatus==='entregue'){
           clearInterval(omiPollTimer);omiPollTimer=null;
           setTimeout(()=>{
@@ -1572,10 +1584,13 @@ async function omiChatSend() {
   }
 
   try {
-    const apiMessages = omiChatMessages.map(m => ({
-      role: m.role,
-      content: m.role === 'assistant' ? m.content + (m.expr ? ` ||expr:${m.expr}||` : '') : m.content
-    }));
+    // Filtra mensagens de sistema/tracking — Claude API só aceita user/assistant com content
+    const apiMessages = omiChatMessages
+      .filter(m => m.type!=='tracking' && (m.role==='user'||m.role==='assistant') && m.content)
+      .map(m => ({
+        role: m.role,
+        content: m.role==='assistant' ? m.content+(m.expr?` ||expr:${m.expr}||`:'') : m.content
+      }));
 
     const res = await fetch(CLAUDE_API, {
       method: 'POST',
