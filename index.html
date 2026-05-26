@@ -712,7 +712,7 @@ function omiMsg(nome,orders){
 
 function renderDrawer(){
  const body=document.getElementById('drawerBody');const items=getBagItems();if(items.length===0){fecharDrawer();return;}
- const sub=getBagSubtotal(),temDesc=descontoAtivo&&!descontoUsado,descAuto=getDescontoAutomatico(),total=getBagTotal();
+ const sub=getBagSubtotal(),temDesc=!membroCoroa&&descontoAtivo&&!descontoUsado,descAuto=getDescontoAutomatico(),total=getBagTotal();
  const p=totalPedidosPagos+1;const pill=membroCoroa?'MEMBRO DA COROA':(clienteNome?`PEDIDO ${p}/12`:'CADASTRO');
  let html=`<div class="omi-float"><img class="omi-char" src="${omiExpr(totalPedidosPagos)}" alt="O-Mi"><div class="omi-speech-col"><div class="omi-speech-top"><span class="omi-brand">O-Mi</span><span class="omi-pill ${membroCoroa?'vip':''}">${pill}</span></div><div class="omi-msg">${omiMsg(clienteNome||'Cidadão',totalPedidosPagos)}</div></div></div>`;
  items.forEach((item,i)=>{html+=`<div class="drawer-item"><div class="di-num">${String(i+1).padStart(2,'0')}</div><div class="di-info"><div class="di-tipo">${tipoLabel(item.id)}</div><div class="di-name">${item.nome}</div>${item.sub?`<div class="di-sub">${item.sub}</div>`:''}</div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="qty-btn" onclick="setQty('${item.id}',-1)">−</button><span class="qty-num">${item.qty}</span><button class="qty-btn" onclick="setQty('${item.id}',1)">+</button><div class="di-price">${fmtVal(item.preco*item.qty)}</div></div></div>`;});
@@ -758,7 +758,7 @@ async function finalizarPedidoOMI(){
   const items=getBagItems();
   if(!items.length) return;
   if(!clienteNome||!clienteWhats){showToast('Complete seu cadastro primeiro!');return;}
-  const temDesc=descontoAtivo&&!descontoUsado;
+  const temDesc=!membroCoroa&&descontoAtivo&&!descontoUsado;
   const sub=getBagSubtotal();
   const descAuto=getDescontoAutomatico();
   const total=getBagTotal();
@@ -1394,7 +1394,9 @@ function iniciarPollPedido(orderId){
       }
     }catch(e){}
   }
-  omiPollTimer=setInterval(function(){_tickPoll();},5000);
+  // Também faz poll de mensagens do admin
+  omiPollMensagens();
+  omiPollTimer=setInterval(function(){_tickPoll();omiPollMensagens();},5000);
 }
 let omiUltimaMsgCount=0;
 
@@ -1535,6 +1537,26 @@ async function omiChatSend() {
   omiChatMessages.push({role:'user', content:msg});
   omiChatLoading = true;
   renderOMIChatMessages();
+  // Salva mensagem do cliente em omi_mensagens (visível para o admin/cozinha)
+  if(omiConvId){
+    fetch(`${SUPA_URL}/rest/v1/omi_mensagens`,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        conversa_id:omiConvId,
+        autor:'cliente',
+        tipo:'texto',
+        conteudo:msg,
+        criado_em:new Date().toISOString()
+      })
+    }).catch(()=>{});
+    // Atualiza última msg na conversa
+    fetch(`${SUPA_URL}/rest/v1/omi_conversas?id=eq.${omiConvId}`,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({ultima_msg:msg.substring(0,80),nao_lidas:99})
+    }).catch(()=>{});
+  }
 
   try {
     const apiMessages = omiChatMessages.map(m => ({
@@ -1561,6 +1583,17 @@ async function omiChatSend() {
     const text = raw.replace(/\|\|expr:\w+\|\|/, '').trim();
 
     omiChatMessages.push({role:'assistant', content:text, expr});
+    // Salva resposta do O-Mi em omi_mensagens para histórico admin
+    if(omiConvId){
+      fetch(`${SUPA_URL}/rest/v1/omi_mensagens`,{
+        method:'POST',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({
+          conversa_id:omiConvId,autor:'omi',tipo:'texto',
+          conteudo:text.substring(0,500),criado_em:new Date().toISOString()
+        })
+      }).catch(()=>{});
+    }
 
     // Update avatar based on expression
     const avatar = document.getElementById('omiChatAvatar');
