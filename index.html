@@ -789,7 +789,9 @@ ${valoresLinha}
 
 Como vai preferir pagar?`;
 
+  limparOMIChat(); // limpa histórico antigo
   omiChatMessages=[{role:'assistant', content:msgResumo, expr: totalPedidosPagos===0?'feliz':'atento'}];
+  salvarOMIChat(); // salva novo review antes de abrir
   fecharDrawer();
   openOMIChat();
   clearBag();
@@ -966,9 +968,10 @@ async function encaminharPedidoFinal(){
   if(!p){showToast('Erro: pedido não encontrado');return;}
 
   // Remove botão
-  document.querySelectorAll('#omiChatMsgs button').forEach(b=>{
-    if(b.textContent.includes('ENCAMINHAR')) b.closest('div').remove();
-  });
+  // Remove todos os botões interativos (pagamento + encaminhar)
+  document.querySelectorAll('#omiChatMsgs button').forEach(b=>b.closest('div')?.remove());
+  const payBtns=document.getElementById('pagamento-btns');
+  if(payBtns) payBtns.remove();
 
   // Garante conversa (separado — não bloqueia o pedido se falhar)
   try{ await garantirConversa(); }catch(e){}
@@ -1332,7 +1335,8 @@ async function garantirConversa(){
 }
 
 function openOMIChat() {
-  carregarOMIChat();
+  // Só carrega localStorage se não tem mensagens em memória (evita sobrescrever review novo)
+  if(omiChatMessages.length===0) carregarOMIChat();
   // Se tem histórico, retoma; senão inicia novo
   if(omiChatMessages.length>0){
     document.getElementById('omiChatModal').classList.add('open');
