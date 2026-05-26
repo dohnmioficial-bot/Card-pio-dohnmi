@@ -143,6 +143,20 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 
 /* ── O-MI FLOAT TRACKER ── */
 #omiFloat{position:fixed;left:10px;top:148px;z-index:350;display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+
+/* ── OMI CHAT TRACKING CARD ── */
+.omi-track-card{background:linear-gradient(135deg,rgba(10,32,18,.95),rgba(4,11,6,.95));border:1.5px solid rgba(242,193,46,.3);border-radius:12px;padding:10px 12px;margin:6px 0;width:100%}
+.omi-track-steps{display:flex;gap:4px;margin-bottom:8px}
+.omi-track-step{flex:1;text-align:center;font-size:.46rem;font-weight:800;letter-spacing:.06em;padding:4px 2px;border-radius:4px;background:rgba(242,193,46,.08);color:rgba(242,193,46,.3);transition:all .4s}
+.omi-track-step.done{background:rgba(242,193,46,.18);color:var(--gold)}
+.omi-track-step.active{background:rgba(242,193,46,.25);color:var(--gold);animation:pulse-bar .9s infinite}
+.omi-track-bar{display:flex;gap:3px;margin-bottom:8px}
+.omi-track-bar-s{flex:1;height:2.5px;border-radius:2px;background:rgba(242,193,46,.1);transition:background .4s}
+.omi-track-bar-s.done{background:var(--gold)}
+.omi-track-bar-s.active{background:var(--gold);animation:pulse-bar .9s infinite}
+.omi-track-items{font-size:.58rem;color:var(--text2);line-height:1.6;margin-bottom:5px}
+.omi-track-total{font-family:'DM Mono',monospace;font-size:.65rem;font-weight:700;color:var(--gold)}
+
 .omi-ft-ava{position:relative;width:54px;height:54px;flex-shrink:0}
 .omi-ft-ava img{width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 4px 16px rgba(242,193,46,.5));animation:omiFloat 3s ease-in-out infinite}
 .omi-ft-dot{position:absolute;bottom:1px;right:1px;width:13px;height:13px;border-radius:50%;background:var(--gold);border:2.5px solid var(--dark);animation:pulse-tb 1.5s infinite;display:none}
@@ -583,20 +597,28 @@ function getDescontoAutomatico(){
  // Auto-corrige prêmios que ficaram travados
  // Hambúrguer grátis = válido APENAS no 8º pedido (após 7º confirmado)
  // Se totalPedidosPagos já passou de 8, o prêmio expirou
- if(premioHamburguerPendente&&totalPedidosPagos>=8){
+ if(premioHamburguerPendente&&totalPedidosPagos>=7){
    premioHamburguerPendente=false;salvar();
    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
      method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
      body:JSON.stringify({premio_hamburguer:false})
    }).catch(()=>{});
  }
- if(premioComboPendente&&totalPedidosPagos>=13){
+ if(premioComboPendente&&totalPedidosPagos>=12){
    premioComboPendente=false;salvar();
    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
      method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
      body:JSON.stringify({premio_combo:false})
    }).catch(()=>{});
  }
+  // Auto-corrige membroCoroa se total>=12 mas flag não setada
+  if(totalPedidosPagos>=12&&!membroCoroa){
+   membroCoroa=true;salvar();
+   fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+     method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+     body:JSON.stringify({membro_coroa:true})
+   }).catch(()=>{});
+  }
 
  if(membroCoroa){
    let d=0;
@@ -621,7 +643,7 @@ function getDescontoAutomatico(){
 function getBagItems(){return Object.values(bag).filter(i=>i.qty>0)}
 function getBagCount(){return getBagItems().reduce((s,i)=>s+i.qty,0)}
 function getBagSubtotal(){return getBagItems().reduce((s,i)=>s+(i.preco*i.qty),0)}
-function getBagTotal(){let s=getBagSubtotal();if(descontoAtivo&&!descontoUsado)s*=0.9;s-=getDescontoAutomatico();s+=getTaxaEntrega();return Math.max(0,s)}
+function getBagTotal(){let s=getBagSubtotal();if(!membroCoroa&&descontoAtivo&&!descontoUsado)s*=0.9;s-=getDescontoAutomatico();s+=getTaxaEntrega();return Math.max(0,s)}
 function addToBag(id,nome,preco,sub){if(!bag[id])bag[id]={id,nome,preco,qty:0,sub:sub||''};bag[id].qty++;updateBagBar();if(isDrawerOpen)renderDrawer()}
 function setQty(id,delta){if(!bag[id])return;bag[id].qty=Math.max(0,bag[id].qty+delta);if(bag[id].qty===0)delete bag[id];updateBagBar();if(isDrawerOpen)renderDrawer()}
 function clearBag(){bag={};updateBagBar();document.querySelectorAll('.bc.selected,.rc.selected,.mc.selected,.cc.selected').forEach(el=>el.classList.remove('selected'));document.querySelectorAll('.qty-num').forEach(el=>el.textContent='1');hamburgers.forEach(b=>{const s=document.getElementById('tb-s-'+b.id),d=document.getElementById('tb-d-'+b.id);if(s&&d){s.classList.add('active');d.classList.remove('active');}})}
@@ -1075,9 +1097,16 @@ async function encaminharPedidoFinal(){
   const nome1=clienteNome.split(' ')[0];
   omiChatMessages.push({
     role:'assistant',
-    content:`Pedido encaminhado! 🚀\n\nA cozinha já recebeu, ${nome1}. Assim que confirmarmos eu te aviso aqui mesmo. Fica de olho aqui no chat. 👑`,
+    content:`Pedido encaminhado! 🚀\n\nA cozinha já recebeu, ${nome1}. Assim que confirmarmos eu te aviso aqui mesmo. 👑`,
     expr:'feliz'
   });
+  // Card de tracking dentro do chat
+  if(omiOrderSnapshot){
+    omiChatMessages.push({
+      role:'system',type:'tracking',status:'novo',
+      itens:omiOrderSnapshot.itens,total:omiOrderSnapshot.total
+    });
+  }
   salvarOMIChat();
   renderOMIChatMessages();
   // Inicia polling + floating bubble após 1.5s
@@ -1241,8 +1270,8 @@ async function syncClienteSupabase(){
     premioHamburguerPendente=hamb&&tot<8;
     premioComboPendente=combo&&tot<13;
     // Corrige no Supabase se estava errado
-    if(hamb&&tot>=8) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
-    if(combo&&tot>=13) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
+    if(hamb&&tot>=7) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
+    if(combo&&tot>=12) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
     // Segurança: CROMI Membro nunca passa de R$11,90
     if(d.membro_coroa&&cromiAcumulado>11.90){
       cromiAcumulado=11.90;
@@ -1345,8 +1374,12 @@ function iniciarPollPedido(orderId){
         omiActiveOrderStatus=novoStatus;
         mostrarTrackingBubble(novoStatus);
         const msgStatus=OMI_STATUS_MSGS[novoStatus]||'';
-        omiChatMessages.push({role:'assistant',content:msgStatus,expr:novoStatus==='entregue'?'feliz':'atento'});
+        // Atualiza card de tracking no chat
+        const _tm=omiChatMessages.find(m=>m.type==='tracking');
+        if(_tm){_tm.status=novoStatus;}
+        else{omiChatMessages.push({role:'assistant',content:msgStatus,expr:novoStatus==='entregue'?'feliz':'atento'});}
         salvarOMIChat();
+        renderOMIChatMessages();
         if(novoStatus==='entregue'){
           clearInterval(omiPollTimer);omiPollTimer=null;
           setTimeout(()=>{
@@ -1468,10 +1501,19 @@ function renderOMIChatMessages() {
   const container = document.getElementById('omiChatMsgs');
   const avatar = omiExpr(totalPedidosPagos);
   let html = '';
+  const STATUS_STEPS=['novo','em_preparo','saiu','entregue'];
+  const STATUS_LABELS_CHAT=['RECEBIDO','EM PREPARO','SAIU','ENTREGUE'];
   omiChatMessages.forEach(m => {
-    if (m.role === 'assistant') {
+    if(m.type==='tracking'){
+      const si=STATUS_STEPS.indexOf(m.status||'novo');
+      const bars=STATUS_STEPS.map((_,i)=>`<div class="omi-track-bar-s ${i<si?'done':i===si?'done active':''}"></div>`).join('');
+      const steps=STATUS_LABELS_CHAT.map((l,i)=>`<div class="omi-track-step ${i<si?'done':i===si?'done active':''}">${l}</div>`).join('');
+      const itensHtml=(m.itens||[]).slice(0,4).map(i=>`• ${i.qty||1}× ${i.nome||i.id||'Item'}`).join('<br>');
+      const totalFmt='R$ '+((m.total||0).toFixed(2).replace('.',','));
+      html+=`<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div class="omi-track-card"><div class="omi-track-bar">${bars}</div><div class="omi-track-steps">${steps}</div><div class="omi-track-items">${itensHtml}</div><div class="omi-track-total">${totalFmt}</div></div></div></div>`;
+    } else if (m.role === 'assistant') {
       html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text">${m.content.replace(/\n/g,'<br>')}</div></div>`;
-    } else {
+    } else if(m.role === 'user'){
       html += `<div class="omi-cm-bubble user">${m.content.replace(/\n/g,'<br>')}</div>`;
     }
   });
@@ -1773,8 +1815,8 @@ async function confirmarRetornoCodigo(){
     premioHamburguerPendente=hamb&&tot>=6&&tot<8;
     premioComboPendente=combo&&tot>=11&&tot<13;
     // Auto-corrige prêmios com janela errada no Supabase
-    if(hamb&&tot>=8)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
-    if(combo&&tot>=13)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
+    if(hamb&&tot>=7)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
+    if(combo&&tot>=12)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
     // Segurança: CROMI Membro nunca passa de R$11,90
     if(d.membro_coroa&&(d.cromi_acumulado||0)>11.90)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({cromi_acumulado:11.90})}).catch(()=>{});membroCoroa=d.membro_coroa||false;
     salvar();showToast('👑 Bem-vindo de volta, '+clienteNome.split(' ')[0]+'!');
