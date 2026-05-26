@@ -1010,15 +1010,21 @@ async function encaminharPedidoFinal(){
     };
     const r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
       method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(payload)
     });
     if(r.ok){
       try{
-        const res=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos?select=id&ordem=criado_em.desc&limit=1&cliente_whats=eq.${encodeURIComponent(clienteWhats)}`,{headers:H});
-        const rows=await res.json();
-        if(rows&&rows[0]) savedOrderId=rows[0].id;
-      }catch(e2){}
+        const created=await r.json();
+        if(created&&created[0]&&created[0].id){
+          savedOrderId=created[0].id;
+        } else {
+          // fallback: busca o último pedido (PostgREST usa order= não ordem=)
+          const res=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos?select=id&order=criado_em.desc&limit=1&cliente_whats=eq.${encodeURIComponent(clienteWhats)}`,{headers:H});
+          const rows=await res.json();
+          if(rows&&rows[0]) savedOrderId=rows[0].id;
+        }
+      }catch(e2){console.warn('Erro ao obter ID do pedido:',e2);}
     } else {
       const err=await r.text();
       console.warn('omi_pedidos error:',r.status,err);
@@ -1042,14 +1048,16 @@ async function encaminharPedidoFinal(){
   }
   // Zera no Supabase também
   if((usouHamb||usouCombo)&&clienteWhats){
-    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
-      method:'PATCH',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({
-        premio_hamburguer: usouHamb?false:premioHamburguerPendente,
-        premio_combo: usouCombo?false:premioComboPendente
-      })
-    }).catch(()=>{});
+    try{
+      await fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({
+          premio_hamburguer: usouHamb?false:premioHamburguerPendente,
+          premio_combo: usouCombo?false:premioComboPendente
+        })
+      });
+    }catch(e){console.warn('Erro ao zerar prêmio:',e);}
   }
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
   orders.unshift({data:new Date().toISOString(),itens:JSON.parse(p.itens||'[]'),status:'recebido',pagamentoConfirmado:false,avaliado:false});
@@ -1073,7 +1081,15 @@ async function encaminharPedidoFinal(){
   salvarOMIChat();
   renderOMIChatMessages();
   // Inicia polling + floating bubble após 1.5s
-  if(savedOrderId) setTimeout(()=>iniciarPollPedido(savedOrderId),1500);
+  // Mostra tracker sempre — polling só se tiver o ID
+  setTimeout(()=>{
+    if(savedOrderId){
+      iniciarPollPedido(savedOrderId);
+    } else {
+      // Sem ID: mostra tracker estático 'novo' sem polling
+      mostrarTrackingBubble('novo');
+    }
+  },1500);
 }
 
 function finalizarPedido(){const items=getBagItems();if(!items.length)return;if(!clienteNome||!clienteWhats){showToast('Complete seu cadastro!');return;}const temDesc=descontoAtivo&&!descontoUsado;const sub=getBagSubtotal(),descAuto=getDescontoAutomatico(),total=getBagTotal();const orderId=gerarId();let msg=`👑 *PEDIDO DOHN'MI*
