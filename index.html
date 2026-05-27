@@ -647,24 +647,29 @@ function getDescontoAutomatico(){
    }).catch(()=>{});
   }
 
- if(membroCoroa){
+  if(membroCoroa){
+   // ── Bônus exclusivos Membro da Coroa ──
+   const _hj=new Date(),_dia=_hj.getDate(),_mes=_hj.getMonth()+1,_dow=_hj.getDay();
+   let _dataEsp=false;
+   if(_dia===12&&_mes===10)_dataEsp=true; // Crianças
+   if(_dia===12&&_mes===6)_dataEsp=true;  // Namorados
+   if(_mes===5&&_dow===0){let _c=0;for(let _i=1;_i<=_dia;_i++){if(new Date(_hj.getFullYear(),4,_i).getDay()===0)_c++;}if(_c===2)_dataEsp=true;} // Mães
+   if(_mes===8&&_dow===0){let _c=0;for(let _i=1;_i<=_dia;_i++){if(new Date(_hj.getFullYear(),7,_i).getDay()===0)_c++;}if(_c===2)_dataEsp=true;} // Pais
+   let _diaAniv=false;
+   if(clienteAniv){const _pts=clienteAniv.split('/');if(_pts.length>=2)_diaAniv=_hj.getDate()===parseInt(_pts[0])&&(_hj.getMonth()+1)===parseInt(_pts[1]);}
    let d=0;
-   // Verifica data especial (CROMI aplicado SEM zerar)
-   const hj=new Date(),dia=hj.getDate(),mes=hj.getMonth()+1,dow=hj.getDay();
-   let dataEsp=false;
-   if(dia===12&&mes===10)dataEsp=true; // Crianças
-   if(dia===12&&mes===6)dataEsp=true;  // Namorados
-   if(mes===5&&dow===0){let cnt=0;for(let i=1;i<=dia;i++){if(new Date(hj.getFullYear(),4,i).getDay()===0)cnt++;}if(cnt===2)dataEsp=true;} // Mães
-   if(mes===8&&dow===0){let cnt=0;for(let i=1;i<=dia;i++){if(new Date(hj.getFullYear(),7,i).getDay()===0)cnt++;}if(cnt===2)dataEsp=true;} // Pais
-   if(dataEsp&&cromiAcumulado>0)d+=cromiAcumulado; // não zera
-   else if(clienteAniv){const pts=clienteAniv.split('/');if(pts.length===2){const di=parseInt(pts[0]),me=parseInt(pts[1]);if(hj.getDate()===di&&hj.getMonth()+1===me)d+=11.90;}} // aniversário não zera
-   else if(cromiAcumulado>=11.89)d+=11.90; // cashback normal — ZERA (>=11.89 por precisão float)
+   if(_diaAniv) d+=11.90;                              // 🎂 Aniversário: R$11,90 fixo
+   if(_dataEsp&&cromiAcumulado>0) d+=cromiAcumulado*2; // 🎉 Data especial: CROMI × 2
+   else if(!_diaAniv&&cromiAcumulado>=11.89) d+=11.90; // cashback normal membro
    return Math.min(d,sub);
  }
- let d=0;const p=totalPedidosPagos+1;
+ // Jornada — sem bônus de datas especiais
+ let d=0;
+ const p=totalPedidosPagos+1;
  const proj=cromiAcumulado+([1,2,3,4,8,9,10].includes(p)?1.49:0);
  if(p===4&&proj>=5.96)d+=5.96;else if(p===10&&proj>=4.47)d+=4.47;
- if(premioHamburguerPendente)d+=17.90;if(premioComboPendente)d+=26.90;
+ if(premioHamburguerPendente)d+=17.90;
+ if(premioComboPendente)d+=26.90;
  return Math.min(d,sub);
 }
 function getBagItems(){return Object.values(bag).filter(i=>i.qty>0)}
@@ -745,7 +750,8 @@ function renderDrawer(){
  items.forEach((item,i)=>{html+=`<div class="drawer-item"><div class="di-num">${String(i+1).padStart(2,'0')}</div><div class="di-info"><div class="di-tipo">${tipoLabel(item.id)}</div><div class="di-name">${item.nome}</div>${item.sub?`<div class="di-sub">${item.sub}</div>`:''}</div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="qty-btn" onclick="setQty('${item.id}',-1)">−</button><span class="qty-num">${item.qty}</span><button class="qty-btn" onclick="setQty('${item.id}',1)">+</button><div class="di-price">${fmtVal(item.preco*item.qty)}</div></div></div>`;});
  html+='<div class="drawer-divider"></div>';
  if(temDesc)html+=`<div class="drawer-row"><span>Subtotal</span><span>${fmtVal(sub)}</span></div><div class="drawer-row desc-row"><span> Desconto −10%</span><span>−${fmtVal(sub*0.1)}</span></div>`;
- if(descAuto>0){const lbl=premioHamburguerPendente?' Hambúrguer grátis!':premioComboPendente?' Combo grátis!':' Cashback ativo!';html+=`<div class="cashback-box"><div class="cashback-label">${lbl}</div><div class="cashback-calc">${fmtVal(temDesc?sub*0.9:sub)} − ${fmtVal(descAuto)}</div></div>`;}
+ if(descAuto>0){const _hjD=new Date(),_anivD=clienteAniv?((_hjD.getDate()===parseInt((clienteAniv.split('/')||[])[0]))&&((_hjD.getMonth()+1)===parseInt((clienteAniv.split('/')||[])[1]))):false;
+const lbl=premioHamburguerPendente?' Hambúrguer grátis! 🎁':premioComboPendente?' Combo grátis! 🎁':_anivD?' Aniversário! 🎂 R$11,90':' Cashback ativo!';html+=`<div class="cashback-box"><div class="cashback-label">${lbl}</div><div class="cashback-calc">${fmtVal(temDesc?sub*0.9:sub)} − ${fmtVal(descAuto)}</div></div>`;}
  if(!membroCoroa)html+=`<div class="drawer-row"><span> Taxa de entrega</span><span>R$ 1,99</span></div>`;
  html+=`<div class="total-box" style="gap:8px"><div class="sh-icon ic-scroll" style="width:28px;height:28px;flex-shrink:0"></div><div class="total-label">TOTAL</div><div class="total-val">${fmtVal(total)}</div></div>`;
  html+=`<div class="split-bar">
@@ -832,7 +838,8 @@ async function finalizarPedidoOMI(){
   let valoresLinha = '';
   if(temDesc) valoresLinha += `Subtotal: ${fmtVal(sub)}\nDesconto −10%: −${fmtVal(sub*0.1)}\n`;
   if(descAuto>0){
-    const lbl = premioHamburguerPendente?'Hambúrguer grátis':premioComboPendente?'Combo grátis':'Cashback';
+    const _hj2=new Date(),_diaA2=clienteAniv?(_hj2.getDate()===parseInt((clienteAniv.split('/')||[])[0])&&(_hj2.getMonth()+1)===parseInt((clienteAniv.split('/')||[])[1])):false;
+    const lbl = premioHamburguerPendente?'Hambúrguer grátis 🎁':premioComboPendente?'Combo grátis 🎁':_diaA2?'Aniversário 🎂':'Cashback CROMI';
     valoresLinha += `${lbl}: −${fmtVal(descAuto)}\n`;
   }
   if(membroCoroa) valoresLinha += `Entrega Grátis 🛵\n`;
