@@ -1579,7 +1579,16 @@ function openOMIChat() {
     if(av&&omiExpr) av.src=omiExpr(totalPedidosPagos)||'';
     const sub=document.getElementById('omiChatSub');
     if(sub&&clienteNome) sub.textContent=`OLÁS, ${clienteNome.split(' ')[0].toUpperCase()} · DOHN'MI`;
+    // Garante tracking card com resumo do pedido ativo
+    if(omiActiveOrderId&&omiOrderSnapshot){
+      const hasTrack=omiChatMessages.some(m=>m.type==='tracking');
+      if(!hasTrack){
+        omiChatMessages.push({role:'assistant',type:'tracking',status:omiActiveOrderStatus||'novo',
+          content:'__tracking__',itens:omiOrderSnapshot.itens,total:omiOrderSnapshot.total});
+      }
+    }
     renderOMIChatMessages();
+    openOMIChatMsgPoll();
     // Se tem itens novos na sacola e a conversa está resolvida, adiciona nota
     const items=getBagItems();
     const last=omiChatMessages[omiChatMessages.length-1];
