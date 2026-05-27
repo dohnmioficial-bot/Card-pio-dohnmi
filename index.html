@@ -624,7 +624,7 @@ function getDescontoAutomatico(){
  // Auto-corrige prêmios que ficaram travados
  // Hambúrguer grátis = válido APENAS no 8º pedido (após 7º confirmado)
  // Se totalPedidosPagos já passou de 8, o prêmio expirou
- if(premioHamburguerPendente&&totalPedidosPagos>=7){
+ if(premioHamburguerPendente&&totalPedidosPagos>=6){
    premioHamburguerPendente=false;salvar();
    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
      method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
@@ -665,9 +665,10 @@ function getDescontoAutomatico(){
  }
  // Jornada — sem bônus de datas especiais
  let d=0;
- const p=totalPedidosPagos+1;
- const proj=cromiAcumulado+([1,2,3,4,8,9,10].includes(p)?1.49:0);
- if(p===4&&proj>=5.96)d+=5.96;else if(p===10&&proj>=4.47)d+=4.47;
+ // Cashback baseado em cromiAcumulado já sincronizado (sem projeção — elimina delay)
+ // Admin faz bump para 5,96 após pedido 3 e valor natural 4,47 após pedido 9
+ if(cromiAcumulado>=5.95) d+=5.96;        // cashback 1: ativo após pedido 3 entregue
+ else if(cromiAcumulado>=4.46&&totalPedidosPagos>=7) d+=4.47; // cashback 2: ativo após pedido 9
  if(premioHamburguerPendente)d+=17.90;
  if(premioComboPendente)d+=26.90;
  return Math.min(d,sub);
