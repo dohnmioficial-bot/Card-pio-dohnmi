@@ -559,7 +559,7 @@ async function supaLoadCliente(){
   fase=d.fase||fase;
   totalPedidosPagos=d.total_pedidos||0;
   cromiAcumulado=d.cromi_acumulado||0;
-  selosPedidos=JSON.parse(d.selos||'{}');
+  selosPedidos=normalizarSelos(JSON.parse(d.selos||'{}'));
   desconto=d.desconto_usado||false;
   premioHamburguerPendente=d.premio_hamburguer||false;
   premioComboPendente=d.premio_combo||false;
@@ -611,6 +611,16 @@ const combos=[
 ];
 const COMBO_SELO={'combo-soberano':'soberano','combo-monarca':'monarca','combo-imperio':'imperio','combo-dame':'dameCombo'};
 let bag={},isDrawerOpen=false,clienteNome='',clienteWhats='',clienteAniv='',clienteEnd='',fase='cupom',descontoAtivo=false,descontoUsado=false,totalPedidosPagos=0,premioHamburguerPendente=false,premioComboPendente=false,membroCoroa=false,cromiAcumulado=0,selosPedidos={};
+
+// Normaliza selos: cashcromi só válido nas posições 4 e 10 (jornada)
+function normalizarSelos(selos){
+  const s=selos||{};
+  Object.keys(s).forEach(k=>{
+    const pos=parseInt(k);
+    if(s[k]==='cashcromi'&&!membroCoroa&&pos!==4&&pos!==10) delete s[k];
+  });
+  return s;
+}
 function salvar(){try{localStorage.setItem('dohnmi_v12',JSON.stringify({fase,clienteNome,clienteWhats,clienteAniv,clienteEnd,descontoAtivo,descontoUsado,totalPedidosPagos,premioHamburguerPendente,premioComboPendente,membroCoroa,cromiAcumulado,selosPedidos}));}catch(e){}}
 function carregar(){try{const d=JSON.parse(localStorage.getItem('dohnmi_v12'));if(!d)return;fase=d.fase||'cupom';clienteNome=d.clienteNome||'';clienteWhats=d.clienteWhats||'';clienteAniv=d.clienteAniv||'';clienteEnd=d.clienteEnd||'';descontoAtivo=!!d.descontoAtivo;descontoUsado=!!d.descontoUsado;totalPedidosPagos=d.totalPedidosPagos||0;premioHamburguerPendente=!!d.premioHamburguerPendente;premioComboPendente=!!d.premioComboPendente;membroCoroa=!!d.membroCoroa;cromiAcumulado=d.cromiAcumulado||0;selosPedidos=d.selosPedidos||{};}catch(e){}}
 function fmtVal(v){return `R$ ${v.toFixed(2).replace('.',',')}`}
@@ -1311,7 +1321,7 @@ async function syncClienteSupabase(){
     // Atualiza variáveis locais com dados do Supabase
     totalPedidosPagos=d.total_pedidos||0;
     cromiAcumulado=d.cromi_acumulado!=null?d.cromi_acumulado:0;
-    selosPedidos=JSON.parse(d.selos||'{}');
+    selosPedidos=normalizarSelos(JSON.parse(d.selos||'{}'));
     membroCoroa=d.membro_coroa||false;
     // Prêmios: só válidos na janela correta de pedidos
     const hamb=d.premio_hamburguer||false;
@@ -2008,7 +2018,7 @@ async function confirmarRetornoCodigo(){
     clienteWhats=d.whatsapp;clienteNome=d.nome||'';clienteAniv=d.aniversario||'';
     clienteEnd=d.endereco||'';fase=d.fase||'jornada';
     totalPedidosPagos=d.total_pedidos||0;cromiAcumulado=d.cromi_acumulado||0;
-    selosPedidos=JSON.parse(d.selos||'{}');descontoAtivo=!d.desconto_usado;
+    selosPedidos=normalizarSelos(JSON.parse(d.selos||'{}'));descontoAtivo=!d.desconto_usado;
     descontoUsado=d.desconto_usado||false;const hamb=d.premio_hamburguer||false;
     const combo=d.premio_combo||false;
     const tot=d.total_pedidos||0;
@@ -2061,7 +2071,7 @@ async function confirmarRetorno(){
   clienteWhats=z;clienteNome=d.nome||'';clienteAniv=d.aniversario||a;
   clienteEnd=d.endereco||'';fase=d.fase||'jornada';
   totalPedidosPagos=d.total_pedidos||0;cromiAcumulado=d.cromi_acumulado||0;
-  selosPedidos=JSON.parse(d.selos||'{}');desconto=d.desconto_usado||false;
+  selosPedidos=normalizarSelos(JSON.parse(d.selos||'{}'));desconto=d.desconto_usado||false;
   premioHamburguerPendente=d.premio_hamburguer||false;
   premioComboPendente=d.premio_combo||false;membroCoroa=d.membro_coroa||false;
   salvar();
@@ -2109,7 +2119,7 @@ function init(){carregar();
       fase=d.fase||fase;
       totalPedidosPagos=d.total_pedidos||totalPedidosPagos;
       cromiAcumulado=d.cromi_acumulado!=null?d.cromi_acumulado:cromiAcumulado;
-      selosPedidos=JSON.parse(d.selos||'{}');
+      selosPedidos=normalizarSelos(JSON.parse(d.selos||'{}'));
       desconto=d.desconto_usado||desconto;
       premioHamburguerPendente=d.premio_hamburguer||premioHamburguerPendente;
       premioComboPendente=d.premio_combo||premioComboPendente;
