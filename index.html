@@ -1095,7 +1095,17 @@ async function encaminharPedidoFinal(){
 
   // Atualiza estado local + zera prêmios usados no Supabase
   const descAuto=getDescontoAutomatico();
-  if(descontoAtivo&&!descontoUsado) descontoUsado=true;
+  if(descontoAtivo&&!descontoUsado){
+    descontoUsado=true;
+    // Persiste imediatamente no Supabase para evitar reset no próximo sync
+    if(clienteWhats){
+      fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({desconto_usado:true})
+      }).catch(()=>{});
+    }
+  }
   const usouHamb=premioHamburguerPendente&&descAuto>0;
   const usouCombo=premioComboPendente&&descAuto>0;
   if(usouHamb) premioHamburguerPendente=false;
