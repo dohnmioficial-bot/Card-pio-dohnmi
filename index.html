@@ -1181,29 +1181,82 @@ async function encaminharPedidoFinal(){
   },1500);
 }
 
-function finalizarPedido(){const items=getBagItems();if(!items.length)return;if(!clienteNome||!clienteWhats){showToast('Complete seu cadastro!');return;}const temDesc=descontoAtivo&&!descontoUsado;const sub=getBagSubtotal(),descAuto=getDescontoAutomatico(),total=getBagTotal();const orderId=gerarId();let msg=`👑 *PEDIDO DOHN'MI*
-━━━━━━━━━━━━━━━
+async function finalizarPedido(){
+  const items=getBagItems();
+  if(!items.length)return;
+  if(!clienteNome||!clienteWhats){showToast('Complete seu cadastro!');return;}
+  const temDesc=descontoAtivo&&!descontoUsado;
+  const sub=getBagSubtotal(),descAuto=getDescontoAutomatico(),total=getBagTotal();
+  const orderId=gerarId();
+  const snap=items.map(i=>({id:i.id,nome:i.nome,qty:i.qty,preco:i.preco,sub:i.sub||''}));
 
-👤 *Cliente:* ${clienteNome}
-📋 *Pedido #${orderId}*
+  // ── 1. Salva pedido no Supabase (igual O-Mi Chat) ──
+  try{
+    if(!omiConvId&&clienteWhats) await garantirConversa().catch(()=>{});
+    const payload={
+      cliente_whats:clienteWhats,
+      cliente_nome:clienteNome,
+      cliente_end:clienteEnd||'',
+      itens:JSON.stringify(snap),
+      total:total,
+      forma_pagamento:'WhatsApp',
+      troco:null,
+      conversa_id:omiConvId||null,
+      origem:'whatsapp',
+      status:'novo',
+      criado_em:new Date().toISOString(),
+      atualizado_em:new Date().toISOString()
+    };
+    const r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(r.ok){
+      const created=await r.json();
+      const savedId=created&&created[0]&&created[0].id;
+      if(savedId){
+        omiActiveOrderId=savedId;
+        omiActiveOrderStatus='novo';
+        omiOrderSnapshot={itens:snap,total,sub:sub,pagamento:'WhatsApp'};
+        setTimeout(()=>iniciarPollPedido(savedId),1500);
+      }
+    }
+  }catch(e){console.warn('WhatsApp order save failed:',e);}
 
-🛒 *Itens:*
-${items.map(i=>`• ${i.name}${i.qty>1?' x'+i.qty:''} — R$${(i.price*i.qty).toFixed(2).replace('.',',')}`).join('\n')}
+  // -- 2. Monta mensagem WhatsApp --
+  const fmtV=v=>'R$ '+v.toFixed(2).replace('.',',');
+  let linhasItens=items.map(function(i){return '- '+i.qty+'x '+i.nome+(i.sub?' ('+i.sub+')':'')+' - '+fmtV(i.preco*i.qty);}).join('\n');
+  let valoresLinha='Subtotal: '+fmtV(sub)+'\n';
+  if(temDesc) valoresLinha+='Desconto -10%: -'+fmtV(sub*0.1)+'\n';
+  if(descAuto>0&&!temDesc){
+    var lblWa=premioHamburguerPendente?'Hamburguer gratis':premioComboPendente?'Combo gratis':'Cashback CROMI';
+    valoresLinha+=lblWa+': -'+fmtV(descAuto)+'\n';
+  }
+  valoresLinha+='Taxa de entrega: '+(membroCoroa?'Gratis':fmtV(1.99))+'\nTotal: '+fmtV(total);
+  var msg='*PEDIDO DOHN MI*\n'+clienteEnd+'\n\n'+linhasItens+'\n\n'+valoresLinha;
+// ── 3. Atualiza estado local ──
+  const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
+  orders.unshift({id:orderId,data:new Date().toISOString(),itens:snap,status:'recebido',pagamentoConfirmado:false,avaliado:false});
+  localStorage.setItem('dohnmi_orders',JSON.stringify(orders));
+  if(temDesc){
+    descontoUsado=true;
+    if(clienteWhats){
+      fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({desconto_usado:true})
+      }).catch(()=>{});
+    }
+  }
+  salvar();
+  supaSave();
+  clearBag();
+  fecharDrawer();
+  window.open(`https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`,'_blank');
+  showToast('Pedido enviado! Acompanhe o status aqui.');
+}
 
-━━━━━━━━━━━━━━━
-${temDesc||descAuto>0?`💰 Subtotal: R$${sub.toFixed(2).replace('.',',')}\n${temDesc?'🎁 Desconto 1º pedido: -10%\n':''}${descAuto>0?'⭐ Desconto CROMI: -R$'+descAuto.toFixed(2).replace('.',',')+'\n':''}`:''}💵 *TOTAL: R$${total.toFixed(2).replace('.',',')}*
-
-📍 *Endereço:* ${clienteEnd||'(retirada)'}
-━━━━━━━━━━━━━━━`;if(clienteEnd)msg+=`Endereço: ${clienteEnd}
-`;msg+=` Código: *${orderId}*
-
-`;items.forEach(i=>{msg+=`• ${i.qty}x ${i.nome}${i.sub?' ('+i.sub+')':''} — ${fmtVal(i.preco*i.qty)}
-`;});if(temDesc)msg+=`
- Desconto 10%: −${fmtVal(sub*0.1)}`;if(descAuto>0)msg+=`
- Prêmio/Cashback: −${fmtVal(descAuto)}`;if(!membroCoroa)msg+=`
- Taxa de entrega: R$ 1,99`;msg+=`
-
-*Total: ${fmtVal(total)}*`;const snap=items.map(i=>{return{id:i.id,nome:i.nome,qty:i.qty,preco:i.preco}});const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');orders.unshift({id:orderId,data:new Date().toISOString(),itens:snap,status:'recebido',pagamentoConfirmado:false,avaliado:false});localStorage.setItem('dohnmi_orders',JSON.stringify(orders));if(temDesc)descontoUsado=true;if(membroCoroa&&cromiAcumulado>=11.90)cromiAcumulado-=11.90;salvar();window.open(`https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`,'_blank');supaSave();clearBag();fecharDrawer();exibirTracking(orderId);showToast(`Pedido ${orderId} enviado! `);}
 function exibirTracking(orderId){const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');const order=orders.find(o=>o.id===orderId);if(!order)return;document.getElementById('trackingOrderId').textContent=` ${order.id}`;const etapas=[{key:'recebido',label:' Pedido recebido'},{key:'preparando',label:' Em preparação'},{key:'saiu_entrega',label:' Saiu para entrega'},{key:'entregue',label:' Entregue'}];const idx=Math.max(0,etapas.findIndex(e=>e.key===order.status));document.getElementById('trackingSteps').innerHTML=etapas.map((e,i)=>`<div class="tstep ${i<=idx?'active':''}"><div class="tstep-icon">${i<=idx?'✓':'○'}</div><div class="tstep-label">${e.label}</div></div>`).join('');const btn=document.getElementById('confirmarPagamentoBtn');btn.textContent=order.pagamentoConfirmado?'✓ Confirmado':' Confirmar Pagamento';btn.style.opacity=order.pagamentoConfirmado?'.5':'1';btn.onclick=order.pagamentoConfirmado?null:()=>confirmarPagamento(orderId);document.getElementById('trackingModal').classList.add('show');}
 
 // ── BACKGROUND SYNC (atualiza selos/CROMI a cada 30s) ──────────────────
