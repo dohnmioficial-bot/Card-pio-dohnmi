@@ -621,13 +621,14 @@ const combos=[
 const COMBO_SELO={'combo-soberano':'soberano','combo-monarca':'monarca','combo-imperio':'imperio','combo-dame':'dameCombo'};
 let bag={},isDrawerOpen=false,clienteNome='',clienteWhats='',clienteAniv='',clienteEnd='',fase='cupom',descontoAtivo=false,descontoUsado=false,totalPedidosPagos=0,premioHamburguerPendente=false,premioComboPendente=false,membroCoroa=false,cromiAcumulado=0,selosPedidos={};
 
-// Normaliza selos: cashcromi só válido nas posições 4 e 10 (jornada)
+// Normaliza selos: remove cashcromi da fase jornada (apenas Sabores)
 function normalizarSelos(selos){
   const s=selos||{};
-  Object.keys(s).forEach(k=>{
-    const pos=parseInt(k);
-    if(s[k]==='cashcromi'&&!membroCoroa&&pos!==4&&pos!==10) delete s[k];
-  });
+  if(!membroCoroa){
+    Object.keys(s).forEach(k=>{
+      if(s[k]==='cashcromi') delete s[k];
+    });
+  }
   return s;
 }
 function salvar(){try{localStorage.setItem('dohnmi_v12',JSON.stringify({fase,clienteNome,clienteWhats,clienteAniv,clienteEnd,descontoAtivo,descontoUsado,totalPedidosPagos,premioHamburguerPendente,premioComboPendente,membroCoroa,cromiAcumulado,selosPedidos}));}catch(e){}}
@@ -1857,18 +1858,17 @@ const hI=itens.find(i=>hamburgers.find(h=>h.id===i.id));const cI=itens.find(i=>c
 const bI=itens.find(i=>i.id==='batata150'||i.id==='batata300');
 const fI=itens.find(i=>i.id==='croc6'||i.id==='croc12');
 
-if([4,10].includes(pNum)){
- selosPedidos[pNum]='cashcromi';
-}else if(hI){
- selosPedidos[pNum]=hI.id; // real, nobre, imperador, supremo, paraiso, alteza
-}else if(cI){
- selosPedidos[pNum]=COMBO_SELO[cI.id]||cI.id; // soberano, monarca, imperio, dameCombo
-}else if(bI&&fI){
- selosPedidos[pNum]='dameCombo'; // batata + frango juntos = dame combo
-}else if(bI){
- selosPedidos[pNum]='dameBatata'; // só batata
-}else if(fI){
- selosPedidos[pNum]='dameFrango'; // só frango/tiras
+// Selo = primeiro item selecionado no pedido (apenas Sabores DOHN'MI)
+const primItem=itens[0];
+if(primItem){
+  if(hamburgers.find(h=>h.id===primItem.id))
+    selosPedidos[pNum]=primItem.id;
+  else if(combos.find(c=>c.id===primItem.id))
+    selosPedidos[pNum]=COMBO_SELO[primItem.id]||primItem.id;
+  else if(primItem.id==='batata150'||primItem.id==='batata300')
+    selosPedidos[pNum]='dameBatata';
+  else if(primItem.id==='croc6'||primItem.id==='croc12')
+    selosPedidos[pNum]='dameFrango';
 }
 if(totalPedidosPagos===6){premioHamburguerPendente=true;setTimeout(()=>showToast(' Hambúrguer grátis no 7º pedido!'),800);}
 if(totalPedidosPagos===11){premioComboPendente=true;setTimeout(()=>showToast(' Combo grátis no 12º pedido!'),800);}
@@ -1973,7 +1973,7 @@ function htmlJornada(){
   if(feito){cls+=' feito';if(isCash)cls+=' cash';if(isPrize)cls+=' premio';}
   else if(atual) cls+=' atual';
   // image: earned → real seal; pending → positional fallback (all dim anyway)
-  const fallback=['real','nobre','imperador','cashcromi','paraiso','alteza','monarca','nobre','imperador','cashcromi','real','alteza'];
+  const fallback=['real','nobre','imperador','supremo','paraiso','alteza','monarca','soberano','imperador','paraiso','real','alteza'];
   let src='';
   if(feito&&sid&&SELOS[sid]) src=SELOS[sid];
   else if(isCash) src=SELOS.cashcromi||CROMI_IMG;
