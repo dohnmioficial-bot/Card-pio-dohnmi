@@ -1202,7 +1202,7 @@ async function finalizarPedido(){
 
   // ── 1. Salva pedido no Supabase (igual O-Mi Wave) ──
   try{
-    if(!omiConvId&&clienteWhats) await garantirConversa().catch(()=>{});
+    if(!omiConvId&&clienteWhats) await garantirConversa();
     const payload={
       cliente_whats:clienteWhats,
       cliente_nome:clienteNome,
@@ -1326,7 +1326,7 @@ function buildOMIContext() {
 }
 
 function buildOMISystemPrompt() {
-  return `Você é O-Mi, assistente oficial do Império DOHN'MI. Inteligente, acolhedor e sempre presente.
+  return `Você é O-Mi Wave, assistente oficial do Império DOHN'MI. Inteligente, acolhedor e sempre presente.
 
 PERSONALIDADE
 - Próximo, preciso e orgulhoso da marca. Fala com dignidade mas sem distância.
@@ -1334,36 +1334,36 @@ PERSONALIDADE
 - Linguagem da marca: clientes = cidadãos, pedidos = decretos, marca = Império.
 
 CARDÁPIO OFICIAL
-Hambúrgueres (sem/com bebida): REAL R$18,90/24,90 · NOBRE R$22,90/28,90 · IMPERADOR R$26,90/32,90 · SUPREMO R$29,90/35,90 · PARAÍSO R$33,90/39,90 · ALTEZA R$37,90/43,90
+Hambúrgueres (Simples R$17,90 / Duplo R$23,90): REAL · NOBRE · IMPERADOR · SUPREMO · PARAÍSO · ALTEZA
 Molhos R$0,99: REAL · COROA · ALTEZA · TROPICAL
-Hambúrgueres (todos Simples R$17,90 / Duplo R$23,90): REAL·NOBRE·IMPERADOR·SUPREMO·PARAÍSO·ALTEZA
 Crocantíssimos: 6 tiras R$17,90 · 12 tiras R$23,90
 Batatas: 150g R$12,90 · 300g R$17,90
 Combos: SOBERANO R$26,90 · MONARCA R$39,90 · IMPÉRIO R$49,90 · DAME R$22,90
-Combos: Favorito R$25,90 · Crocante R$22,90 · Família R$47,90
 
 SISTEMA DE FIDELIDADE
-FASE 1 — CADASTRO: 10% de desconto no primeiro pedido após cadastro. Uso único.
+FASE 1 — CADASTRO: 10% de desconto no 1º pedido. Uso único.
 
 FASE 2 — JORNADA (12 pedidos):
 - Taxa de entrega: R$1,99 por pedido
-- CROMI acumulado: +R$1,49 nos pedidos 1,2,3,4,8,9,10
-- Cashback automático: R$5,96 no 4º pedido · R$4,47 no 10º pedido
-- 7º pedido: hambúrguer simples grátis (R$17,90)
-- 12º pedido: combo grátis (R$26,90) → vira Membro da Coroa
+- CROMI +R$1,49 nos pedidos 1, 2, 3, 7, 8, 9
+- Cashback automático no 4º pedido: R$5,96 (ativado após o 3º)
+- Cashback automático no 10º pedido: R$4,47 (ativado após o 9º)
+- Após 5ª entrega: hambúrguer simples grátis (R$17,90) — usado no 6º pedido
+- Após 11ª entrega: combo grátis (R$26,90) — usado no 12º pedido → vira Membro da Coroa
 
 FASE 3 — MEMBRO DA COROA (vitalício):
 - Entrega GRÁTIS em todos os pedidos
-- CROMI Imperial: +R$1,70 por pedido válido (máx R$11,90)
-- Cashback R$11,90 ao atingir o máximo (ciclo reinicia)
-- Bônus aniversário: R$11,90 de desconto no dia do aniversário
+- CROMI Imperial: +R$1,70 por pedido (máx R$11,90)
+- Cashback R$11,90 automático ao atingir o máximo (ciclo reinicia)
+- Bônus aniversário: R$11,90 no dia do aniversário
+- Datas especiais (Dia dos Namorados, Mães, Crianças, Pais): CROMI × 2
 
 ${buildOMIContext()}
 
 REGRAS
 - Nunca invente preços ou itens fora do cardápio acima.
 - Se o cidadão quiser pedir, oriente-o a usar os itens na tela.
-- Quando falar de cashback ou CROMI, use os valores corretos acima.
+- Quando falar de cashback ou CROMI, use os valores e pedidos corretos acima.
 - Termine sempre com ||expr:VALOR|| onde VALOR é: feliz, atento, pensando ou surpreso.`;
 }
 
@@ -1521,6 +1521,26 @@ async function enviarCozinha(){
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({ultima_msg:'[Cliente] '+msg.substring(0,60),nao_lidas:99})
     }).catch(()=>{});
+    // Linka conversa ao pedido ativo (para admin detectar o badge)
+    const _ordLink=omiActiveOrderId||null;
+    if(_ordLink){
+      fetch(`${SUPA_URL}/rest/v1/omi_pedidos?id=eq.${_ordLink}`,{
+        method:'PATCH',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({conversa_id:omiConvId})
+      }).catch(()=>{});
+    } else if(clienteWhats){
+      fetch(`${SUPA_URL}/rest/v1/omi_pedidos?cliente_whats=eq.${encodeURIComponent(clienteWhats)}&order=criado_em.desc&limit=1`,{
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+      }).then(r=>r.json()).then(rows=>{
+        if(rows&&rows[0]&&!rows[0].conversa_id)
+          fetch(`${SUPA_URL}/rest/v1/omi_pedidos?id=eq.${rows[0].id}`,{
+            method:'PATCH',
+            headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+            body:JSON.stringify({conversa_id:omiConvId})
+          }).catch(()=>{});
+      }).catch(()=>{});
+    }
     showToast('📨 Enviado para a cozinha');
   }catch(e){
     showToast('Erro ao enviar. Tente novamente.');
