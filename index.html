@@ -1068,6 +1068,9 @@ async function encaminharPedidoFinal(){
   const p=window._omiPedidoAtual;
   let savedOrderId=null;
   if(!p){showToast('Erro: pedido não encontrado');return;}
+  // Proteção contra envio duplicado (duplo-clique / clique repetido)
+  if(window._enviandoPedido){return;}
+  window._enviandoPedido=true;
 
   // Remove botão
   // Remove todos os botões interativos (pagamento + encaminhar)
@@ -1195,12 +1198,16 @@ async function encaminharPedidoFinal(){
       mostrarTrackingBubble('novo');
     }
   },1500);
+  window._enviandoPedido=false;
 }
 
 async function finalizarPedido(){
   const items=getBagItems();
   if(!items.length)return;
   if(!clienteNome||!clienteWhats){showToast('Complete seu cadastro!');return;}
+  // Proteção contra envio duplicado
+  if(window._enviandoPedido){return;}
+  window._enviandoPedido=true;
   const temDesc=descontoAtivo&&!descontoUsado;
   const sub=getBagSubtotal(),descAuto=getDescontoAutomatico(),total=getBagTotal();
   const orderId=gerarId();
@@ -1272,6 +1279,7 @@ async function finalizarPedido(){
   fecharDrawer();
   window.open(`https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`,'_blank');
   showToast('Pedido enviado! Acompanhe o status aqui.');
+  window._enviandoPedido=false;
 }
 
 function exibirTracking(orderId){const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');const order=orders.find(o=>o.id===orderId);if(!order)return;document.getElementById('trackingOrderId').textContent=` ${order.id}`;const etapas=[{key:'recebido',label:' Pedido recebido'},{key:'preparando',label:' Em preparação'},{key:'saiu_entrega',label:' Saiu para entrega'},{key:'entregue',label:' Entregue'}];const idx=Math.max(0,etapas.findIndex(e=>e.key===order.status));document.getElementById('trackingSteps').innerHTML=etapas.map((e,i)=>`<div class="tstep ${i<=idx?'active':''}"><div class="tstep-icon">${i<=idx?'✓':'○'}</div><div class="tstep-label">${e.label}</div></div>`).join('');const btn=document.getElementById('confirmarPagamentoBtn');btn.textContent=order.pagamentoConfirmado?'✓ Confirmado':' Confirmar Pagamento';btn.style.opacity=order.pagamentoConfirmado?'.5':'1';btn.onclick=order.pagamentoConfirmado?null:()=>confirmarPagamento(orderId);document.getElementById('trackingModal').classList.add('show');}
@@ -1838,6 +1846,100 @@ function renderOMIChatMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
+// ════════════════════════════════════════════════════════════════
+//  MOTOR DE RESPOSTAS LOCAL — sem IA, sem custo, sem dependência
+//  Entende as perguntas mais comuns por palavras-chave e responde
+//  usando os dados reais do sistema (cardápio, favorito, CROMI, selos)
+// ════════════════════════════════════════════════════════════════
+function respostaLocalOMI(msgRaw){
+  const m = (msgRaw||'').toLowerCase().trim();
+  const nome1 = (clienteNome||'').split(' ')[0] || 'cidadão';
+  const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); // remove acentos
+  const t = norm(m);
+  const tem = (...ks) => ks.some(k => t.includes(norm(k)));
+
+  // ── Saudação ──
+  if(tem('oi','ola','opa','eai','e ai','bom dia','boa tarde','boa noite','salve')){
+    return {txt:`Saudações, ${nome1}! 👑 Sou o O-Mi Wave, guardião do Império DOHN'MI. Posso te mostrar o cardápio, seus selos, seu CROMI ou ajudar a montar seu decreto. O que deseja?`, expr:'feliz'};
+  }
+
+  // ── "O de sempre" / favorito ──
+  if(tem('de sempre','de costume','o mesmo','meu favorito','sempre peco','sempre peço')){
+    const contagem={};
+    Object.values(selosPedidos||{}).forEach(s=>{contagem[s]=(contagem[s]||0)+1;});
+    const fav=Object.keys(contagem).sort((a,b)=>contagem[b]-contagem[a])[0];
+    const nomes={real:"DOHN'MI REAL",nobre:"DOHN'MI NOBRE",imperador:"DOHN'MI IMPERADOR",supremo:"DOHN'MI SUPREMO",paraiso:"DOHN'MI PARAÍSO",alteza:"DOHN'MI ALTEZA"};
+    if(omiHistorico&&omiHistorico.length){
+      const freq={};
+      omiHistorico.forEach(p=>(p.itens||[]).forEach(i=>{const nm=i.nome||i.id;if(nm)freq[nm]=(freq[nm]||0)+(i.qty||1);}));
+      const top=Object.keys(freq).sort((a,b)=>freq[b]-freq[a])[0];
+      if(top) return {txt:`Seu clássico é o ${top}, ${nome1}. 🔥 Quer trazer ele de volta ao trono? É só tocar no item na tela.`, expr:'feliz'};
+    }
+    if(fav&&nomes[fav]) return {txt:`Você costuma reinar com o ${nomes[fav]}, ${nome1}. 🔥 Toque nele na tela pra adicionar.`, expr:'feliz'};
+    return {txt:`Ainda não conheço seu sabor de sempre, ${nome1}. Faça seu primeiro decreto e eu memorizo pra próxima! 👑`, expr:'atento'};
+  }
+
+  // ── CROMI / saldo ──
+  if(tem('cromi','saldo','cashback','quanto tenho','meu dinheiro','credito','crédito')){
+    if(cromiAcumulado>0) return {txt:`Seu CROMI acumulado é R$ ${cromiAcumulado.toFixed(2).replace('.',',')}, ${nome1}. 🪙 Ele vira desconto automático nos pedidos certos da sua jornada.`, expr:'feliz'};
+    return {txt:`Seu CROMI está zerado agora, ${nome1}. A cada pedido você acumula e ele vira cashback automático. 🪙`, expr:'atento'};
+  }
+
+  // ── Selos / jornada / progresso ──
+  if(tem('selo','jornada','progresso','quantos pedidos','quanto falta','coroa','membro')){
+    if(membroCoroa) return {txt:`Você é Membro da Coroa, ${nome1}! 👑 Entrega grátis sempre, CROMI turbinado e bônus de aniversário. O Império é seu.`, expr:'feliz'};
+    const feitos=totalPedidosPagos;
+    const faltam=Math.max(0,12-feitos);
+    return {txt:`Você está no pedido ${feitos+1} de 12 da sua jornada, ${nome1}. Faltam ${faltam} para virar Membro da Coroa 👑 (com combo grátis no 12º!).`, expr:'atento'};
+  }
+
+  // ── Cardápio geral ──
+  if(tem('cardapio','cardápio','menu','o que tem','opcoes','opções','o que voces tem','o que vcs tem')){
+    return {txt:`No Império temos:\n🍔 Hambúrgueres (Simples R$17,90 · Duplo R$23,90)\n🍗 Crocantíssimos (6 ou 12 tiras)\n🍟 Batatas (150g ou 300g)\n👑 Combos (Soberano, Monarca, Império, Dame)\n\nÉ só rolar a tela e tocar nos itens, ${nome1}!`, expr:'feliz'};
+  }
+
+  // ── Hambúrgueres ──
+  if(tem('hamburguer','hambúrguer','burguer','burger','lanche','sanduiche','sanduíche')){
+    return {txt:`Nossos decretos de carne, ${nome1}:\n• REAL — cheddar e molho REAL\n• NOBRE — frango crocante\n• IMPERADOR — bacon e cebola caramelizada\n• SUPREMO — cream cheese e cebola empanada\n• PARAÍSO — queijo coalho e abacaxi\n• ALTEZA — calabresa e cebola roxa\nSimples R$17,90 · Duplo R$23,90. Toque pra pedir!`, expr:'feliz'};
+  }
+
+  // ── Recomendação ──
+  if(tem('recomenda','sugere','indica','o que e bom','o que é bom','mais pedido','melhor','forte','intenso')){
+    return {txt:`Pra um sabor que reina, ${nome1}: o IMPERADOR (bacon + cheddar + cebola caramelizada) é puro poder. 🔥 Se quer algo mais ousado, o PARAÍSO surpreende. Toque na tela!`, expr:'feliz'};
+  }
+
+  // ── Batata / frango ──
+  if(tem('batata','fritas')) return {txt:`Temos Batata Clássica: 150g (R$12,90) ou 300g (R$17,90), crocante por fora e macia por dentro. 🍟 Toque pra adicionar, ${nome1}!`, expr:'feliz'};
+  if(tem('frango','tiras','crocante','nuggets')) return {txt:`Os Crocantíssimos: 6 tiras (R$17,90) ou 12 tiras (R$23,90) de frango empanado. 🍗 É só tocar, ${nome1}!`, expr:'feliz'};
+
+  // ── Combos ──
+  if(tem('combo','promocao','promoção')){
+    return {txt:`Nossos Combos imperiais, ${nome1}:\n👑 Soberano R$26,90\n👑 Monarca R$39,90\n👑 Império R$49,90\n👑 Dame R$22,90\nToque na seção de combos pra escolher!`, expr:'feliz'};
+  }
+
+  // ── Entrega / taxa / pagamento ──
+  if(tem('entrega','frete','taxa','demora','quanto tempo')){
+    const taxa = membroCoroa?'GRÁTIS (você é Membro da Coroa 👑)':'R$ 1,99';
+    return {txt:`A taxa de entrega é ${taxa}, ${nome1}. Assim que confirmar o pedido, acompanho tudo em tempo real aqui com você. 🛵`, expr:'atento'};
+  }
+  if(tem('pagar','pagamento','pix','cartao','cartão','dinheiro')){
+    return {txt:`Aceitamos Cartão, Dinheiro e Pix — tudo na entrega, ${nome1}. Você escolhe na hora de fechar o decreto. 💳`, expr:'atento'};
+  }
+
+  // ── Horário ──
+  if(tem('horario','horário','aberto','funciona','abre','fecha')){
+    return {txt:`Estamos prontos pra te atender, ${nome1}! Monte seu pedido na tela que o Império cuida do resto. 👑`, expr:'feliz'};
+  }
+
+  // ── Agradecimento ──
+  if(tem('obrigado','obrigada','valeu','vlw','agradeco','agradeço','tmj')){
+    return {txt:`O Império agradece sua presença, ${nome1}. 👑 Sempre que precisar, é só chamar!`, expr:'feliz'};
+  }
+
+  // ── Sem correspondência: resposta útil que direciona ──
+  return null; // null = não entendeu localmente
+}
+
 async function omiChatSend() {
   const input = document.getElementById('omiChatInput');
   const msg = (input.value || '').trim();
@@ -1866,6 +1968,26 @@ async function omiChatSend() {
       }).catch(()=>{});
       showToast('📨 Mensagem enviada para a cozinha');
     }
+  }
+
+  // ── MOTOR LOCAL primeiro (sem IA, sem custo, sem dependência) ──
+  const local = respostaLocalOMI(msg);
+  if(local){
+    setTimeout(()=>{
+      omiChatMessages.push({role:'assistant', content:local.txt, expr:local.expr});
+      const avatar=document.getElementById('omiChatAvatar');
+      if(avatar&&OMI_EXPR[local.expr]) avatar.src=OMI_EXPR[local.expr];
+      if(omiConvId){
+        fetch(`${SUPA_URL}/rest/v1/omi_mensagens`,{
+          method:'POST',
+          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({conversa_id:omiConvId,autor:'omi',tipo:'texto',conteudo:local.txt.substring(0,500),criado_em:new Date().toISOString()})
+        }).catch(()=>{});
+      }
+      omiChatLoading=false;
+      renderOMIChatMessages();
+    }, 400);
+    return;
   }
 
   try {
@@ -1913,7 +2035,8 @@ async function omiChatSend() {
     if (OMI_EXPR[exprMap[expr]]) avatar.src = OMI_EXPR[exprMap[expr]];
 
   } catch(e) {
-    omiChatMessages.push({role:'assistant', content:'Houve uma falha na conexão com o Império. Tente novamente.', expr:'surpreso'});
+    const nome1=(clienteNome||'').split(' ')[0]||'cidadão';
+    omiChatMessages.push({role:'assistant', content:`${nome1}, pra esse pedido específico o melhor é montar direto na tela 👑 — é só tocar nos itens. Posso te mostrar o cardápio, seus selos ou seu CROMI. Sobre o que quer saber?`, expr:'atento'});
   } finally {
     omiChatLoading = false;
     renderOMIChatMessages();
