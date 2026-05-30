@@ -1472,7 +1472,7 @@ let omiActiveOrderStatus=null;
 let omiOrderSnapshot=null;
 
 const OMI_STATUS_LABELS={'novo':'AGUARDANDO OPERAÇÃO','em_preparo':'EM PREPARO','saiu':'SAIU P/ ENTREGA','entregue':'ENTREGUE ✓'};
-const OMI_STATUS_MSGS={'novo':'Aguardando a operação aceitar...','em_preparo':'Seu pedido está sendo preparado! 🔥','saiu':'A caminho da sua casa! 🛵','entregue':'Chegou! Bom apetite! 🎉'};
+const OMI_STATUS_MSGS={'novo':'Aguardando a operação aceitar...','em_preparo':'Seu pedido está sendo preparado! 🔥','saiu':'A caminho da sua casa! 🛵','entregue':'Chegou! Bom apetite! 🎉','cancelado':'Pedido cancelado. Nada foi cobrado nem contabilizado. 🙏','recusado':'Pedido não aceito no momento. Nada foi contabilizado. 🙏'};
 
 // ── STATUS STEPS CONFIG ──
 // 'novo' = -1 (aguardando aceite, nada aceso). Steps começam em em_preparo.
@@ -1681,6 +1681,14 @@ function iniciarPollPedido(orderId){
               esconderTrackingBubble();
             },3500);
           },2000);
+        }
+        if(novoStatus==='cancelado'||novoStatus==='recusado'){
+          // Pedido encerrado sem entrega — nada foi contabilizado. Para o polling e esconde o tracker.
+          clearInterval(omiPollTimer);omiPollTimer=null;
+          // Remove o pedido pendente salvo para não restaurar ao reabrir
+          try{ localStorage.removeItem('omi_active_order'); }catch(e){}
+          omiActiveOrderId=null;
+          setTimeout(()=>esconderTrackingBubble(),3000);
         }
       }
     }catch(e){}
@@ -2386,7 +2394,7 @@ init();
 try{
   const saved=JSON.parse(localStorage.getItem('omi_active_order')||'null');
   if(saved&&saved.snapshot) omiOrderSnapshot=saved.snapshot;
-  if(saved&&saved.id&&saved.status!=='entregue'){
+  if(saved&&saved.id&&!['entregue','cancelado','recusado'].includes(saved.status)){
     omiActiveOrderId=saved.id;omiActiveOrderStatus=saved.status;omiConvId=saved.convId||null;
     setTimeout(()=>{mostrarTrackingBubble(saved.status);iniciarPollPedido(saved.id);},1000);
   }
