@@ -991,47 +991,12 @@ function confirmarTroco(opcao){
 
 function confirmarPagamentoOMI(troco){
   const nome1=clienteNome.split(' ')[0];
-  const descAuto=getDescontoAutomatico();
-  const total=getBagTotal();
-  const pNum=totalPedidosPagos+1;
 
-  // Monta mensagem de confirmação com cashback se aplicável
-  let confirmMsg=`Perfeito, ${nome1}. ✓
-
-`;
-  if(troco&&troco!=='Não preciso') confirmMsg+=`Troco: ${troco}
-`;
-
-  // Informa cashback aplicado
-  if(descAuto>0){
-    const lbl=premioHamburguerPendente?'🎁 Hambúrguer grátis aplicado!':
-              premioComboPendente?'🎁 Combo grátis aplicado!':
-              `💰 Cashback R$ ${descAuto.toFixed(2).replace('.',',')} aplicado!`;
-    confirmMsg+=`${lbl}
-`;
-  }
-
-  // Informa CROMI que vai acumular
-  const pedidosComCromi=[1,2,3,4,8,9,10];
-  if(!membroCoroa&&pedidosComCromi.includes(pNum)&&descAuto===0){
-    confirmMsg+=`+R$ 1,49 CROMI neste pedido
-`;
-  } else if(membroCoroa){
-    confirmMsg+=`+R$ 1,70 CROMI Imperial
-`;
-  }
-
-  // Próximo marco
-  if(!membroCoroa){
-    if(pNum<7) confirmMsg+=`
-Faltam ${7-pNum} pedidos para o hambúrguer grátis 🍔`;
-    else if(pNum<12) confirmMsg+=`
-Faltam ${12-pNum} pedidos para Membro da Coroa 👑`;
-  }
-
-  confirmMsg+=`
-
-Tudo certo! É só encaminhar.`;
+  // Mensagem de confirmacao SEM nenhuma informacao de fidelidade.
+  // CROMI, cashback, premios e marcos so sao informados pela operacao no ENTREGUE.
+  let confirmMsg=`Perfeito, ${nome1}. \u2713\n`;
+  if(troco&&troco!=='Não preciso') confirmMsg+=`\nTroco: ${troco}\n`;
+  confirmMsg+=`\nTudo certo! É só encaminhar.`;
 
   omiChatMessages.push({role:'assistant', content:confirmMsg, expr:'feliz'});
   renderOMIChatMessages();
@@ -1486,11 +1451,12 @@ let omiActiveOrderId=null;
 let omiActiveOrderStatus=null;
 let omiOrderSnapshot=null;
 
-const OMI_STATUS_LABELS={'novo':'PEDIDO RECEBIDO','em_preparo':'EM PREPARO','saiu':'SAIU P/ ENTREGA','entregue':'ENTREGUE ✓'};
-const OMI_STATUS_MSGS={'novo':'Aguardando a cozinha confirmar...','em_preparo':'Seu pedido está sendo preparado! 🔥','saiu':'A caminho da sua casa! 🛵','entregue':'Chegou! Bom apetite! 🎉'};
+const OMI_STATUS_LABELS={'novo':'AGUARDANDO OPERAÇÃO','em_preparo':'EM PREPARO','saiu':'SAIU P/ ENTREGA','entregue':'ENTREGUE ✓'};
+const OMI_STATUS_MSGS={'novo':'Aguardando a operação aceitar...','em_preparo':'Seu pedido está sendo preparado! 🔥','saiu':'A caminho da sua casa! 🛵','entregue':'Chegou! Bom apetite! 🎉'};
 
 // ── STATUS STEPS CONFIG ──
-const OMI_STEP_MAP={novo:0,em_preparo:1,saiu:2,entregue:3};
+// 'novo' = -1 (aguardando aceite, nada aceso). Steps começam em em_preparo.
+const OMI_STEP_MAP={novo:-1,em_preparo:0,saiu:1,entregue:2};
 
 function mostrarTrackingBubble(status){
   // Dot
@@ -1503,8 +1469,8 @@ function mostrarTrackingBubble(status){
   const lbl=document.getElementById('omiFloatLbl');
   if(lbl) lbl.textContent=OMI_STATUS_LABELS[status]||'PEDIDO';
   // Steps
-  const stepIdx=OMI_STEP_MAP[status]||0;
-  for(let i=0;i<4;i++){
+  const stepIdx=OMI_STEP_MAP[status]??-1;
+  for(let i=0;i<3;i++){
     const s=document.getElementById('omiStep'+i);
     if(!s) continue;
     s.className='omi-ft-step';
@@ -1683,7 +1649,7 @@ function iniciarPollPedido(orderId){
         if(novoStatus==='entregue'){
           clearInterval(omiPollTimer);omiPollTimer=null;
           setTimeout(()=>{
-            supaLoadCliente();
+            sincronizarFidelidade();
             // Fecha chat automaticamente após ENTREGUE + selo liberado
             setTimeout(()=>{
               closeOMIChat();
@@ -1833,16 +1799,21 @@ function renderOMIChatMessages() {
   const container = document.getElementById('omiChatMsgs');
   const avatar = omiExpr(totalPedidosPagos);
   let html = '';
-  const STATUS_STEPS=['novo','em_preparo','saiu','entregue'];
-  const STATUS_LABELS_CHAT=['RECEBIDO','EM PREPARO','SAIU','ENTREGUE'];
+  const STATUS_STEPS=['em_preparo','saiu','entregue'];
+  const STATUS_LABELS_CHAT=['EM PREPARO','SAIU','ENTREGUE'];
   omiChatMessages.forEach(m => {
     if(m.type==='tracking'){
-      const si=STATUS_STEPS.indexOf(m.status||'novo');
+      // 'novo' = aguardando a operação aceitar → NADA aceso ainda.
+      // O progresso só começa a partir de em_preparo (após aceite).
+      const st=m.status||'novo';
+      const si=(st==='novo')?-1:STATUS_STEPS.indexOf(st);
+      const aguardando=(st==='novo');
       const bars=STATUS_STEPS.map((_,i)=>`<div class="omi-track-bar-s ${i<si?'done':i===si?'done active':''}"></div>`).join('');
       const steps=STATUS_LABELS_CHAT.map((l,i)=>`<div class="omi-track-step ${i<si?'done':i===si?'done active':''}">${l}</div>`).join('');
+      const aguardaHtml=aguardando?`<div style="text-align:center;font-size:.52rem;font-weight:800;letter-spacing:.08em;color:rgba(242,193,46,.6);margin-bottom:8px">⏳ AGUARDANDO A OPERAÇÃO ACEITAR</div>`:'';
       const itensHtml=(m.itens||[]).slice(0,4).map(i=>`• ${i.qty||1}× ${i.nome||i.id||'Item'}`).join('<br>');
       const totalFmt='R$ '+((m.total||0).toFixed(2).replace('.',','));
-      html+=`<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div class="omi-track-card"><div class="omi-track-bar">${bars}</div><div class="omi-track-steps">${steps}</div><div class="omi-track-items">${itensHtml}</div><div class="omi-track-total">${totalFmt}</div></div></div></div>`;
+      html+=`<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div class="omi-track-card">${aguardaHtml}<div class="omi-track-bar">${bars}</div><div class="omi-track-steps">${steps}</div><div class="omi-track-items">${itensHtml}</div><div class="omi-track-total">${totalFmt}</div></div></div></div>`;
     } else if (m.role === 'assistant') {
       html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text">${m.content.replace(/\n/g,'<br>')}</div></div>`;
     } else if(m.role === 'user'){
@@ -2421,7 +2392,6 @@ setInterval(()=>{if(clienteWhats&&document.visibilityState==='visible')supaLoadC
       <div class="omi-ft-step" id="omiStep0"></div>
       <div class="omi-ft-step" id="omiStep1"></div>
       <div class="omi-ft-step" id="omiStep2"></div>
-      <div class="omi-ft-step" id="omiStep3"></div>
     </div>
     <div class="omi-ft-items" id="omiFloatItems"></div>
     <div class="omi-ft-total" id="omiFloatTotal"></div>
