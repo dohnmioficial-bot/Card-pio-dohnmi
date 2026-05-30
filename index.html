@@ -144,7 +144,7 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 .drawer-inner{padding:0 16px}
 
 /* ── O-MI FLOAT TRACKER ── */
-#omiFloat{display:none!important;position:fixed;left:10px;top:148px;z-index:350;align-items:flex-start;gap:8px;cursor:pointer}
+#omiFloat{display:none;position:fixed;left:10px;top:148px;z-index:350;align-items:flex-start;gap:8px;cursor:pointer}
 
 /* ── OMI CHAT TRACKING CARD ── */
 .omi-track-card{background:linear-gradient(135deg,rgba(10,32,18,.95),rgba(4,11,6,.95));border:1.5px solid rgba(242,193,46,.3);border-radius:12px;padding:10px 12px;margin:6px 0;width:100%}
@@ -1459,6 +1459,9 @@ const OMI_STATUS_MSGS={'novo':'Aguardando a operação aceitar...','em_preparo':
 const OMI_STEP_MAP={novo:-1,em_preparo:0,saiu:1,entregue:2};
 
 function mostrarTrackingBubble(status){
+  // Mostra o container flutuante sobre o cardápio
+  const float=document.getElementById('omiFloat');
+  if(float) float.style.display='flex';
   // Dot
   const dot=document.getElementById('omiFloatDot');
   if(dot) dot.style.display='block';
@@ -1492,6 +1495,8 @@ function mostrarTrackingBubble(status){
 }
 
 function esconderTrackingBubble(){
+  const float=document.getElementById('omiFloat');
+  if(float) float.style.display='none';
   const dot=document.getElementById('omiFloatDot');
   if(dot) dot.style.display='none';
   const card=document.getElementById('omiFloatCard');
@@ -2367,8 +2372,8 @@ try{
   }
 }catch(e){}
 
-// Background sync
-setInterval(()=>{if(clienteWhats&&document.visibilityState==='visible')supaLoadCliente();},30000);
+// Background sync — mantém a fidelidade (atualizada pela operação no ENTREGUE) em dia
+setInterval(()=>{if(clienteWhats&&document.visibilityState==='visible')sincronizarFidelidade();},30000);
 </script>
 
 <div class="pwa-banner" id="pwaBanner" style="display:none">
