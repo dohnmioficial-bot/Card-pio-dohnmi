@@ -1757,6 +1757,9 @@ function iniciarPollPedido(orderId){
               omiActiveOrderId=null;
               omiOrderSnapshot=null;
               omiFlowState=null;
+              // Zera a conversa para o poll não re-buscar as mensagens antigas da operação
+              omiConvId=null;
+              omiUltimaMsgCount=0;
             },3500);
           },2000);
         }
@@ -2559,10 +2562,12 @@ try{
     omiActiveOrderId=saved.id;omiActiveOrderStatus=saved.status;omiConvId=saved.convId||null;
     setTimeout(()=>{mostrarTrackingBubble(saved.status);iniciarPollPedido(saved.id);},1000);
   } else if(saved&&['entregue','cancelado','recusado'].includes(saved.status)){
-    // Pedido anterior já finalizado: limpa histórico e tracker antigos
+    // Pedido anterior já finalizado: limpa histórico, conversa e tracker antigos
     limparOMIChat();
     try{ localStorage.removeItem('omi_active_order'); }catch(e){}
     omiOrderSnapshot=null;
+    omiConvId=null;
+    omiUltimaMsgCount=0;
   }
 }catch(e){}
 
