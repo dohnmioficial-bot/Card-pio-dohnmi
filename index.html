@@ -944,27 +944,32 @@ Como vai preferir pagar?`;
   clearBag();
 
   // Botões de pagamento
-  setTimeout(()=>{
-    const msgs=document.getElementById('omiChatMsgs');
-    if(!msgs) return;
-    const sug=document.createElement('div');
-    sug.id='pagamento-btns';
-    sug.style.cssText='display:flex;gap:8px;margin-top:4px;flex-wrap:wrap';
-    ['💳 Cartão','💵 Dinheiro','📱 Pix'].forEach(forma=>{
-      const b=document.createElement('button');
-      b.textContent=forma;
-      b.style.cssText='flex:1;min-width:80px;padding:10px 8px;background:rgba(242,193,46,.06);border:1px solid rgba(242,193,46,.18);border-radius:10px;color:var(--gold);font-size:.78rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:.2s';
-      b.onmouseenter=()=>b.style.background='rgba(242,193,46,.14)';
-      b.onmouseleave=()=>b.style.background='rgba(242,193,46,.06)';
-      b.onclick=()=>escolherPagamento(forma);
-      sug.appendChild(b);
-    });
-    msgs.appendChild(sug);
-    msgs.scrollTop=msgs.scrollHeight;
-  },300);
+  omiFlowState='pagamento';
+  setTimeout(()=>{ injetarBotoesPagamento(); },300);
+}
+
+function injetarBotoesPagamento(){
+  const msgs=document.getElementById('omiChatMsgs');
+  if(!msgs) return;
+  if(document.getElementById('pagamento-btns')) return;
+  const sug=document.createElement('div');
+  sug.id='pagamento-btns';
+  sug.style.cssText='display:flex;gap:8px;margin-top:4px;flex-wrap:wrap';
+  ['💳 Cartão','💵 Dinheiro','📱 Pix'].forEach(forma=>{
+    const b=document.createElement('button');
+    b.textContent=forma;
+    b.style.cssText='flex:1;min-width:80px;padding:10px 8px;background:rgba(242,193,46,.06);border:1px solid rgba(242,193,46,.18);border-radius:10px;color:var(--gold);font-size:.78rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:.2s';
+    b.onmouseenter=()=>b.style.background='rgba(242,193,46,.14)';
+    b.onmouseleave=()=>b.style.background='rgba(242,193,46,.06)';
+    b.onclick=()=>escolherPagamento(forma);
+    sug.appendChild(b);
+  });
+  msgs.appendChild(sug);
+  msgs.scrollTop=msgs.scrollHeight;
 }
 
 function escolherPagamento(forma){
+  omiFlowState=null;
   const btns=document.getElementById('pagamento-btns');
   if(btns) btns.remove();
   const waOpt=document.getElementById('pagamento-wa');
@@ -976,51 +981,51 @@ function escolherPagamento(forma){
   // Se Dinheiro → pergunta troco antes de mostrar ENCAMINHAR
   if(forma.includes('Dinheiro')){
     const nome1=clienteNome.split(' ')[0];
-    const total=window._omiPedidoAtual?.total||0;
     omiChatMessages.push({
       role:'assistant',
       content:`Anotado, ${nome1}. Vai precisar de troco?`,
       expr:'atento'
     });
+    omiFlowState='troco';
     renderOMIChatMessages();
-    setTimeout(()=>{
-      const msgs=document.getElementById('omiChatMsgs');
-      if(!msgs) return;
-      const sug=document.createElement('div');
-      sug.id='troco-btns';
-      sug.style.cssText='display:flex;gap:6px;margin-top:4px;flex-wrap:wrap';
-      // Botão sem troco
-      const bSem=document.createElement('button');
-      bSem.textContent='Não preciso de troco';
-      bSem.style.cssText='width:100%;padding:10px 14px;background:rgba(242,193,46,.06);border:1px solid rgba(242,193,46,.18);border-radius:10px;color:var(--gold);font-size:.74rem;font-weight:900;cursor:pointer;font-family:Inter,sans-serif;margin-bottom:8px';
-      bSem.onclick=()=>confirmarTroco('Sem troco');
-      sug.appendChild(bSem);
-
-      // Input valor manual
-      const inputRow=document.createElement('div');
-      inputRow.style.cssText='display:flex;gap:8px;align-items:center';
-      const lbl=document.createElement('div');
-      lbl.textContent='Troco p/';
-      lbl.style.cssText='font-size:.7rem;color:rgba(232,223,200,.55);flex-shrink:0;font-weight:700';
-      const inp=document.createElement('input');
-      inp.id='trocoInput';inp.type='number';inp.placeholder='0,00';
-      inp.inputMode='decimal';inp.min='0';inp.step='0.01';
-      inp.style.cssText='flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(242,193,46,.2);border-radius:10px;padding:10px 12px;color:#e8dfc8;font-size:.88rem;font-family:Inter,sans-serif;outline:none';
-      inp.onkeydown=(e)=>{if(e.key==='Enter')document.getElementById('trocoConfirmBtn').click();};
-      const btnOk=document.createElement('button');
-      btnOk.id='trocoConfirmBtn';btnOk.textContent='OK';
-      btnOk.style.cssText='padding:10px 14px;background:linear-gradient(135deg,#F2C12E,#C99D1F);border:none;border-radius:10px;color:#050e08;font-size:.74rem;font-weight:900;cursor:pointer;font-family:Inter,sans-serif;flex-shrink:0';
-      btnOk.onclick=()=>confirmarTrocoValor();
-      inputRow.appendChild(lbl);inputRow.appendChild(inp);inputRow.appendChild(btnOk);
-      sug.appendChild(inputRow);
-      msgs.appendChild(sug);
-      msgs.scrollTop=msgs.scrollHeight;
-    },300);
+    setTimeout(()=>{ injetarBotoesTroco(); },300);
     return;
   }
 
   // Pix ou Cartão — confirma e mostra ENCAMINHAR
   confirmarPagamentoOMI();
+}
+
+function injetarBotoesTroco(){
+  const msgs=document.getElementById('omiChatMsgs');
+  if(!msgs) return;
+  if(document.getElementById('troco-btns')) return;
+  const sug=document.createElement('div');
+  sug.id='troco-btns';
+  sug.style.cssText='display:flex;gap:6px;margin-top:4px;flex-wrap:wrap';
+  const bSem=document.createElement('button');
+  bSem.textContent='Não preciso de troco';
+  bSem.style.cssText='width:100%;padding:10px 14px;background:rgba(242,193,46,.06);border:1px solid rgba(242,193,46,.18);border-radius:10px;color:var(--gold);font-size:.74rem;font-weight:900;cursor:pointer;font-family:Inter,sans-serif;margin-bottom:8px';
+  bSem.onclick=()=>confirmarTroco('Sem troco');
+  sug.appendChild(bSem);
+  const inputRow=document.createElement('div');
+  inputRow.style.cssText='display:flex;gap:8px;align-items:center';
+  const lbl=document.createElement('div');
+  lbl.textContent='Troco p/';
+  lbl.style.cssText='font-size:.7rem;color:rgba(232,223,200,.55);flex-shrink:0;font-weight:700';
+  const inp=document.createElement('input');
+  inp.id='trocoInput';inp.type='number';inp.placeholder='0,00';
+  inp.inputMode='decimal';inp.min='0';inp.step='0.01';
+  inp.style.cssText='flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(242,193,46,.2);border-radius:10px;padding:10px 12px;color:#e8dfc8;font-size:.88rem;font-family:Inter,sans-serif;outline:none';
+  inp.onkeydown=(e)=>{if(e.key==='Enter')document.getElementById('trocoConfirmBtn').click();};
+  const btnOk=document.createElement('button');
+  btnOk.id='trocoConfirmBtn';btnOk.textContent='OK';
+  btnOk.style.cssText='padding:10px 14px;background:linear-gradient(135deg,#F2C12E,#C99D1F);border:none;border-radius:10px;color:#050e08;font-size:.74rem;font-weight:900;cursor:pointer;font-family:Inter,sans-serif;flex-shrink:0';
+  btnOk.onclick=()=>confirmarTrocoValor();
+  inputRow.appendChild(lbl);inputRow.appendChild(inp);inputRow.appendChild(btnOk);
+  sug.appendChild(inputRow);
+  msgs.appendChild(sug);
+  msgs.scrollTop=msgs.scrollHeight;
 }
 
 function confirmarTrocoValor(){
@@ -1032,6 +1037,7 @@ function confirmarTrocoValor(){
 }
 
 function confirmarTroco(opcao){
+  omiFlowState=null;
   const btns=document.getElementById('troco-btns');
   if(btns) btns.remove();
   if(window._omiPedidoAtual) window._omiPedidoAtual.troco=opcao;
@@ -1049,13 +1055,17 @@ function confirmarPagamentoOMI(troco){
   confirmMsg+=`\nTudo certo! É só encaminhar.`;
 
   omiChatMessages.push({role:'assistant', content:confirmMsg, expr:'feliz'});
+  omiFlowState='encaminhar';
   renderOMIChatMessages();
+  setTimeout(()=>{ injetarBotoesEncaminhar(); },300);
+}
 
-  // Botão ENCAMINHAR dividido: [O-MI Wave] [WhatsApp]
-  setTimeout(()=>{
-    const msgs=document.getElementById('omiChatMsgs');
-    if(!msgs) return;
+function injetarBotoesEncaminhar(){
+  const msgs=document.getElementById('omiChatMsgs');
+  if(!msgs) return;
+  if(document.getElementById('encaminhar-btns')) return;
     const wrap=document.createElement('div');
+    wrap.id='encaminhar-btns';
     wrap.style.cssText='margin-top:8px;animation:omi-fadeUp .3s ease;display:flex;gap:8px';
     wrap.innerHTML=`
       <button onclick="encaminharPedidoFinal('omi')" style="
@@ -1084,11 +1094,11 @@ function confirmarPagamentoOMI(troco){
       </button>`;
     msgs.appendChild(wrap);
     msgs.scrollTop=msgs.scrollHeight;
-  },300);
-}
+  }
 
 async function encaminharPedidoFinal(canal){
   canal = canal||'omi';
+  omiFlowState=null;
   const p=window._omiPedidoAtual;
   let savedOrderId=null;
   if(!p){showToast('Erro: pedido não encontrado');return;}
@@ -1890,6 +1900,20 @@ function closeOMIChat() {
   if(omiMsgPollInterval){clearInterval(omiMsgPollInterval);omiMsgPollInterval=null;}
 }
 
+// Estado do fluxo de finalização (para reconstruir botões após re-render do chat)
+// null | 'pagamento' | 'troco' | 'encaminhar'
+let omiFlowState=null;
+
+function reconstruirBotoesFluxo(){
+  const msgs=document.getElementById('omiChatMsgs');
+  if(!msgs||!omiFlowState) return;
+  // evita duplicar
+  if(document.getElementById('pagamento-btns')||document.getElementById('troco-btns')||document.getElementById('encaminhar-btns')) return;
+  if(omiFlowState==='pagamento'){ injetarBotoesPagamento(); }
+  else if(omiFlowState==='troco'){ injetarBotoesTroco(); }
+  else if(omiFlowState==='encaminhar'){ injetarBotoesEncaminhar(); }
+}
+
 function renderOMIChatMessages() {
   const container = document.getElementById('omiChatMsgs');
   const avatar = omiExpr(totalPedidosPagos);
@@ -1929,6 +1953,8 @@ function renderOMIChatMessages() {
   }
   container.innerHTML = html;
   container.scrollTop = container.scrollHeight;
+  // Reconstrói os botões do fluxo de finalização (caso o cliente tenha mandado msg no meio)
+  reconstruirBotoesFluxo();
 }
 
 // ════════════════════════════════════════════════════════════════
