@@ -225,6 +225,14 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 .omi-cm-avatar{width:38px;height:38px;border-radius:50%;background:rgba(242,193,46,.1);border:1.5px solid rgba(242,193,46,.35);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
 .omi-cm-avatar img{width:100%;height:100%;object-fit:contain}
 .chip-pulse{animation:chipPulse 2.2s ease-in-out infinite}
+.omi-cm-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid rgba(242,193,46,.12);background:rgba(5,14,8,.6);flex-shrink:0}
+.omi-cm-plus{flex-shrink:0;width:38px;height:38px;border-radius:50%;background:rgba(242,193,46,.12);border:1px solid rgba(242,193,46,.35);color:var(--gold);font-size:1.4rem;font-weight:400;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s}
+.omi-cm-plus.active{transform:rotate(45deg);background:rgba(242,193,46,.2)}
+.omi-cm-inputwrap{flex:1;display:flex;align-items:flex-end;gap:8px;animation:opSlide .2s ease}
+@keyframes opSlide{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.omi-cm-inputwrap textarea{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(242,193,46,.25);border-radius:12px;color:#fff;padding:9px 12px;font-size:.86rem;font-family:Inter,sans-serif;resize:none;outline:none;line-height:1.4}
+.omi-cm-send{flex-shrink:0;width:38px;height:38px;border-radius:50%;background:var(--gold);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.omi-op-status{font-size:.55rem;margin-top:3px;opacity:.8;font-family:Inter,sans-serif}
 @keyframes chipPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 4px rgba(242,193,46,.4))}50%{transform:scale(1.12);filter:drop-shadow(0 0 10px rgba(242,193,46,.8))}}
 @media(prefers-reduced-motion:reduce){.chip-pulse{animation:none}}
 .omi-cm-info{flex:1}
@@ -498,36 +506,17 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
     <button class="omi-cm-back" onclick="closeOMIChat()">← Cardápio</button>
   </div>
   <div class="omi-cm-msgs" id="omiChatMsgs"></div>
-  <!-- Painel cozinha -->
-  <div class="omi-kitchen-backdrop" id="omiKitchenBackdrop" onclick="fecharCozinha()"></div>
-  <div class="omi-kitchen-panel" id="omiKitchenPanel" style="display:none">
-    <div class="omi-kitchen-header">
-      <span>Mensagem para a cozinha</span>
-      <button onclick="fecharCozinha()">✕</button>
-    </div>
-    <div class="omi-kitchen-msgs" id="omiKitchenMsgs"></div>
-    <div class="omi-kitchen-input-row">
-      <textarea id="omiKitchenInput" placeholder="Ex.: pode tirar a cebola?" rows="1"
-        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,60)+'px'"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarCozinha()}"></textarea>
-      <button onclick="enviarCozinha()">
+  <!-- Barra de input do chat: botão + abre campo para falar com a operação -->
+  <div class="omi-cm-bar" id="omiCmBar">
+    <button class="omi-cm-plus" id="omiCmPlus" onclick="toggleOpInput()" title="Falar com a operação">+</button>
+    <div class="omi-cm-inputwrap" id="omiCmInputWrap" style="display:none">
+      <textarea id="omiOpInput" placeholder="Mensagem para a operação..." rows="1"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,70)+'px'"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMsgOperacao()}"></textarea>
+      <button class="omi-cm-send" onclick="enviarMsgOperacao()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke="#050e08" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
-  </div>
-  <!-- Atalho cozinha dentro do chat -->
-  <div id="omiCozinhaChip" onclick="abrirCozinha()" style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(242,193,46,.07);border-top:1px solid rgba(242,193,46,.1);cursor:pointer;transition:.2s" onmouseover="this.style.background='rgba(242,193,46,.14)'" onmouseout="this.style.background='rgba(242,193,46,.07)'">
-    <img class="chip-pulse" src="data:image/webp;base64,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" style="width:28px;height:28px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(242,193,46,.5))">
-    <div>
-      <div style="font-size:.58rem;font-weight:900;color:var(--gold);letter-spacing:.1em">MENSAGEM AO DOHN'MI</div>
-      <div style="font-size:.52rem;color:var(--text2)">Envie uma mensagem direta para a operação</div>
-    </div>
-    <svg style="margin-left:auto;flex-shrink:0" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="rgba(242,193,46,.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  </div>
-
-  <div class="omi-cm-input-area" style="display:none">
-
-
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -1626,48 +1615,37 @@ function esconderTrackingBubble(){
 
 
 
-// ── CANAL COZINHA ──────────────────────────────────────
-let omiKitchenMsgs=[];
-let omiKitchenLastTs=null;
+// ── CANAL OPERAÇÃO (unificado no chat) ──────────────────
 
-function abrirCozinha(){
-  if(!clienteWhats){showToast('Faça seu cadastro primeiro.');return;}
-  const panel=document.getElementById('omiKitchenPanel');
-  const bd=document.getElementById('omiKitchenBackdrop');
-  if(bd) bd.style.display='block';
-  if(panel) panel.style.display='flex';
-  setTimeout(()=>document.getElementById('omiKitchenInput')?.focus(),100);
-  renderKitchenMsgs();
-  if(!omiConvId&&clienteWhats) garantirConversa().catch(()=>{});
+function toggleOpInput(){
+  const wrap=document.getElementById('omiCmInputWrap');
+  const plus=document.getElementById('omiCmPlus');
+  if(!wrap) return;
+  const abrir = wrap.style.display==='none';
+  wrap.style.display = abrir?'flex':'none';
+  if(plus) plus.classList.toggle('active', abrir);
+  if(abrir){ setTimeout(()=>document.getElementById('omiOpInput')?.focus(),60); }
 }
 
-function fecharCozinha(){
-  const panel=document.getElementById('omiKitchenPanel');
-  const bd=document.getElementById('omiKitchenBackdrop');
-  if(panel) panel.style.display='none';
-  if(bd) bd.style.display='none';
-}
-
-function renderKitchenMsgs(){
-  const box=document.getElementById('omiKitchenMsgs');
-  if(!box) return;
-  if(!omiKitchenMsgs.length){
-    box.innerHTML='<div class="omi-kmsg sys">Envie uma mensagem para a cozinha. Respondemos em breve.</div>';
-    return;
-  }
-  box.innerHTML=omiKitchenMsgs.map(m=>`<div class="omi-kmsg ${m.autor==='cliente'?'cli':'adm'}">${m.conteudo}</div>`).join('');
-  box.scrollTop=box.scrollHeight;
-}
-
-async function enviarCozinha(){
-  const inp=document.getElementById('omiKitchenInput');
-  const msg=(inp?.value||'').trim();
+async function enviarMsgOperacao(){
+  const inp=document.getElementById('omiOpInput');
+  const msg=(inp&&inp.value||'').trim();
   if(!msg) return;
-  inp.value='';inp.style.height='auto';
+  if(!clienteWhats){showToast('Faça seu cadastro primeiro.');return;}
+  inp.value=''; inp.style.height='auto';
   if(!omiConvId&&clienteWhats){try{await garantirConversa();}catch(e){}}
   if(!omiConvId){showToast('Sem conexão. Tente novamente.');return;}
-  omiKitchenMsgs.push({autor:'cliente',conteudo:msg});
-  renderKitchenMsgs();
+
+  // Adiciona a mensagem no próprio chat com status 'enviada' (🟡)
+  const msgObj={canal:'operacao',content:msg,status:'enviada'};
+  omiChatMessages.push(msgObj);
+  salvarOMIChat();
+  renderOMIChatMessages();
+  const box=document.getElementById('omiChatMsgs'); if(box) box.scrollTop=box.scrollHeight;
+  // fecha o campo
+  const wrap=document.getElementById('omiCmInputWrap'); if(wrap) wrap.style.display='none';
+  const plus=document.getElementById('omiCmPlus'); if(plus) plus.classList.remove('active');
+
   try{
     await fetch(`${SUPA_URL}/rest/v1/omi_mensagens`,{
       method:'POST',
@@ -1679,7 +1657,7 @@ async function enviarCozinha(){
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({ultima_msg:'[Cliente] '+msg.substring(0,60),nao_lidas:99})
     }).catch(()=>{});
-    // Linka conversa ao pedido ativo (para admin detectar o badge)
+    // Linka conversa ao pedido ativo (para o admin ver o badge)
     const _ordLink=omiActiveOrderId||null;
     if(_ordLink){
       fetch(`${SUPA_URL}/rest/v1/omi_pedidos?id=eq.${_ordLink}`,{
@@ -1687,19 +1665,8 @@ async function enviarCozinha(){
         headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
         body:JSON.stringify({conversa_id:omiConvId})
       }).catch(()=>{});
-    } else if(clienteWhats){
-      fetch(`${SUPA_URL}/rest/v1/omi_pedidos?cliente_whats=eq.${encodeURIComponent(clienteWhats)}&order=criado_em.desc&limit=1`,{
-        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
-      }).then(r=>r.json()).then(rows=>{
-        if(rows&&rows[0]&&!rows[0].conversa_id)
-          fetch(`${SUPA_URL}/rest/v1/omi_pedidos?id=eq.${rows[0].id}`,{
-            method:'PATCH',
-            headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-            body:JSON.stringify({conversa_id:omiConvId})
-          }).catch(()=>{});
-      }).catch(()=>{});
     }
-    showToast('📨 Enviado para a cozinha');
+    showToast('🟡 Mensagem enviada à operação');
   }catch(e){
     showToast('Erro ao enviar. Tente novamente.');
   }
@@ -1711,20 +1678,28 @@ async function pollKitchenMsgs(){
     const r=await fetch(`${SUPA_URL}/rest/v1/omi_mensagens?conversa_id=eq.${omiConvId}&autor=eq.admin&order=criado_em.asc`,{headers:H});
     const lista=await r.json();
     if(!lista||!lista.length) return;
-    const panel=document.getElementById('omiKitchenPanel');
-    const isOpen=panel&&panel.style.display!=='none';
     let novas=false;
     lista.forEach(m=>{
-      const existe=omiKitchenMsgs.some(x=>x.conteudo===m.conteudo&&x.autor===m.autor);
-      if(!existe){omiKitchenMsgs.push({autor:'admin',conteudo:m.conteudo});novas=true;}
+      // já existe essa resposta da operação no chat?
+      const existe=omiChatMessages.some(x=>x.canal==='operacao-resp'&&x.content===m.conteudo);
+      if(!existe){
+        omiChatMessages.push({canal:'operacao-resp',content:m.conteudo});
+        novas=true;
+        // marca a última msg do cliente à operação como 'respondida' (🟢)
+        for(let k=omiChatMessages.length-1;k>=0;k--){
+          if(omiChatMessages[k].canal==='operacao'&&omiChatMessages[k].status==='enviada'){
+            omiChatMessages[k].status='respondida';
+            break;
+          }
+        }
+      }
     });
     if(novas){
-      if(isOpen) renderKitchenMsgs();
-      else{
-        const btn=document.getElementById('omiKitchenToggle');
-        if(btn){btn.style.filter='drop-shadow(0 0 16px gold)';setTimeout(()=>btn.style.filter='',3000);}
-        showToast('Resposta da cozinha!');
-      }
+      salvarOMIChat();
+      renderOMIChatMessages();
+      const box=document.getElementById('omiChatMsgs'); if(box) box.scrollTop=box.scrollHeight;
+      const chatAberto=document.getElementById('omiChatModal')?.classList.contains('open');
+      if(!chatAberto) showToast('🟢 Resposta da operação!');
     }
   }catch(e){}
 }
@@ -1946,6 +1921,15 @@ function renderOMIChatMessages() {
       const itensHtml=(m.itens||[]).slice(0,4).map(i=>`• ${i.qty||1}× ${i.nome||i.id||'Item'}`).join('<br>');
       const totalFmt='R$ '+((m.total||0).toFixed(2).replace('.',','));
       html+=`<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div class="omi-track-card">${aguardaHtml}<div class="omi-track-bar">${bars}</div><div class="omi-track-steps">${steps}</div><div class="omi-track-items">${itensHtml}</div><div class="omi-track-total">${totalFmt}</div></div></div></div>`;
+    } else if(m.canal === 'operacao'){
+      // Mensagem do cliente para a operação (estilo WhatsApp, com status)
+      const statusDot = m.status==='respondida'
+        ? '<span style="color:#4ade80">🟢 respondida</span>'
+        : '<span style="color:#f7c948">🟡 enviada</span>';
+      html += `<div class="omi-cm-bubble user"><div>${m.content.replace(/\n/g,'<br>')}</div><div class="omi-op-status">${statusDot}</div></div>`;
+    } else if(m.canal === 'operacao-resp'){
+      // Resposta da operação
+      html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div style="font-size:.55rem;color:var(--gold);opacity:.7;margin-bottom:2px;font-weight:700">OPERAÇÃO</div>${m.content.replace(/\n/g,'<br>')}</div></div>`;
     } else if (m.role === 'assistant') {
       html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text">${m.content.replace(/\n/g,'<br>')}</div></div>`;
     } else if(m.role === 'user'){
