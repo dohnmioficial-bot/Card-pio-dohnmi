@@ -508,8 +508,7 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
   <div class="omi-cm-msgs" id="omiChatMsgs"></div>
   <!-- Barra de input do chat: botão + abre campo para falar com a operação -->
   <div class="omi-cm-bar" id="omiCmBar">
-    <button class="omi-cm-plus" id="omiCmPlus" onclick="toggleOpInput()" title="Falar com a operação">+</button>
-    <div class="omi-cm-inputwrap" id="omiCmInputWrap" style="display:none">
+    <div class="omi-cm-inputwrap" id="omiCmInputWrap">
       <textarea id="omiOpInput" placeholder="Mensagem para a operação..." rows="1"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,70)+'px'"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMsgOperacao()}"></textarea>
@@ -1617,15 +1616,7 @@ function esconderTrackingBubble(){
 
 // ── CANAL OPERAÇÃO (unificado no chat) ──────────────────
 
-function toggleOpInput(){
-  const wrap=document.getElementById('omiCmInputWrap');
-  const plus=document.getElementById('omiCmPlus');
-  if(!wrap) return;
-  const abrir = wrap.style.display==='none';
-  wrap.style.display = abrir?'flex':'none';
-  if(plus) plus.classList.toggle('active', abrir);
-  if(abrir){ setTimeout(()=>document.getElementById('omiOpInput')?.focus(),60); }
-}
+function toggleOpInput(){ /* obsoleto: campo agora é sempre visível */ }
 
 async function enviarMsgOperacao(){
   const inp=document.getElementById('omiOpInput');
@@ -1642,9 +1633,6 @@ async function enviarMsgOperacao(){
   salvarOMIChat();
   renderOMIChatMessages();
   const box=document.getElementById('omiChatMsgs'); if(box) box.scrollTop=box.scrollHeight;
-  // fecha o campo
-  const wrap=document.getElementById('omiCmInputWrap'); if(wrap) wrap.style.display='none';
-  const plus=document.getElementById('omiCmPlus'); if(plus) plus.classList.remove('active');
 
   try{
     await fetch(`${SUPA_URL}/rest/v1/omi_mensagens`,{
@@ -1929,7 +1917,7 @@ function renderOMIChatMessages() {
       html += `<div class="omi-cm-bubble user"><div>${m.content.replace(/\n/g,'<br>')}</div><div class="omi-op-status">${statusDot}</div></div>`;
     } else if(m.canal === 'operacao-resp'){
       // Resposta da operação
-      html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div style="font-size:.55rem;color:var(--gold);opacity:.7;margin-bottom:2px;font-weight:700">OPERAÇÃO</div>${m.content.replace(/\n/g,'<br>')}</div></div>`;
+      html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div style="font-size:.55rem;color:var(--gold);opacity:.7;margin-bottom:2px;font-weight:700">DOHN'MI</div>${m.content.replace(/\n/g,'<br>')}</div></div>`;
     } else if (m.role === 'assistant') {
       html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text">${m.content.replace(/\n/g,'<br>')}</div></div>`;
     } else if(m.role === 'user'){
