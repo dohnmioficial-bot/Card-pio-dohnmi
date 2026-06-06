@@ -1751,6 +1751,12 @@ function iniciarPollPedido(orderId){
             setTimeout(()=>{
               closeOMIChat();
               esconderTrackingBubble();
+              // Limpa o histórico do pedido entregue — chat começa limpo no próximo
+              limparOMIChat();
+              try{ localStorage.removeItem('omi_active_order'); }catch(e){}
+              omiActiveOrderId=null;
+              omiOrderSnapshot=null;
+              omiFlowState=null;
             },3500);
           },2000);
         }
@@ -2552,6 +2558,11 @@ try{
   if(saved&&saved.id&&!['entregue','cancelado','recusado'].includes(saved.status)){
     omiActiveOrderId=saved.id;omiActiveOrderStatus=saved.status;omiConvId=saved.convId||null;
     setTimeout(()=>{mostrarTrackingBubble(saved.status);iniciarPollPedido(saved.id);},1000);
+  } else if(saved&&['entregue','cancelado','recusado'].includes(saved.status)){
+    // Pedido anterior já finalizado: limpa histórico e tracker antigos
+    limparOMIChat();
+    try{ localStorage.removeItem('omi_active_order'); }catch(e){}
+    omiOrderSnapshot=null;
   }
 }catch(e){}
 
