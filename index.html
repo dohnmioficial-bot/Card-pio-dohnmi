@@ -231,19 +231,19 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 .omi-cm-name{font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:700;color:var(--gold);line-height:1}
 .omi-cm-sub{font-size:.55rem;color:var(--text2);letter-spacing:.12em;font-family:'DM Mono',monospace;margin-top:2px}
 /* COZINHA PANEL */
-.omi-kitchen-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none;animation:kbFade .2s ease}
+.omi-kitchen-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:60;display:none;animation:kbFade .2s ease}
 @keyframes kbFade{from{opacity:0}to{opacity:1}}
-.omi-kitchen-panel{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(180deg,#0a1f12,#040b06);border-top:1.5px solid rgba(242,193,46,.35);border-radius:18px 18px 0 0;z-index:50;display:flex;flex-direction:column;max-height:62vh;box-shadow:0 -12px 40px rgba(0,0,0,.5);animation:kpUp .25s cubic-bezier(.2,.8,.2,1)}
+.omi-kitchen-panel{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(180deg,#0a1f12,#040b06);border-top:1.5px solid rgba(242,193,46,.35);border-radius:18px 18px 0 0;z-index:70;display:flex;flex-direction:column;max-height:70vh;min-height:42vh;box-shadow:0 -12px 50px rgba(0,0,0,.7);animation:kpUp .25s cubic-bezier(.2,.8,.2,1)}
 @keyframes kpUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .omi-kitchen-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(242,193,46,.15);font-size:.6rem;font-weight:800;color:var(--gold);letter-spacing:.1em}
 .omi-kitchen-header button{background:none;border:none;color:rgba(242,193,46,.5);font-size:1rem;cursor:pointer;padding:2px 6px}
 .omi-kitchen-msgs{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:7px;min-height:60px}
-.omi-kmsg{font-size:.65rem;padding:7px 10px;border-radius:10px;max-width:90%;line-height:1.5}
+.omi-kmsg{font-size:.78rem;padding:8px 11px;border-radius:10px;max-width:90%;line-height:1.5}
 .omi-kmsg.cli{background:rgba(242,193,46,.12);color:var(--gold);align-self:flex-end;border:1px solid rgba(242,193,46,.2)}
 .omi-kmsg.adm{background:rgba(255,255,255,.05);color:var(--text2);align-self:flex-start;border:1px solid rgba(255,255,255,.08)}
 .omi-kmsg.sys{color:rgba(242,193,46,.45);font-size:.55rem;align-self:center;background:none;border:none;font-style:italic}
 .omi-kitchen-input-row{display:flex;gap:8px;padding:8px 12px;border-top:1px solid rgba(242,193,46,.1);align-items:flex-end}
-.omi-kitchen-input-row textarea{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(242,193,46,.2);border-radius:10px;color:#fff;padding:8px 10px;font-size:.72rem;resize:none;outline:none}
+.omi-kitchen-input-row textarea{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(242,193,46,.2);border-radius:10px;color:#fff;padding:9px 11px;font-size:.86rem;resize:none;outline:none}
 .omi-kitchen-input-row button{background:var(--gold);border:none;border-radius:50%;width:34px;height:34px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .omi-chat-modal .omi-cm-input-area{position:relative}
 .omi-cm-msgs{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:8px}
