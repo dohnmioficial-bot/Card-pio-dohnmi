@@ -1162,26 +1162,38 @@ async function encaminharPedidoFinal(canal){
       criado_em: new Date().toISOString(),
       atualizado_em: new Date().toISOString()
     };
-    const r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
-      method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
-      body:JSON.stringify(payload)
-    });
+    const _H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+    let r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{method:'POST',headers:_H,body:JSON.stringify(payload)});
+    // Resiliência: se a coluna 'observacao' ainda não existe na tabela, reenvia sem ela
+    if(!r.ok){
+      const errTxt=await r.text();
+      if(errTxt && /observacao/i.test(errTxt)){
+        const obsTxt=payload.observacao;
+        delete payload.observacao;
+        // preserva a observação anexando aos itens, para o admin ainda ver
+        if(obsTxt){
+          try{
+            const arr=JSON.parse(payload.itens);
+            if(Array.isArray(arr)) arr.push({obs:obsTxt});
+            payload.itens=JSON.stringify(arr);
+          }catch(e3){}
+        }
+        r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{method:'POST',headers:_H,body:JSON.stringify(payload)});
+      } else {
+        console.warn('omi_pedidos error:',r.status,errTxt);
+      }
+    }
     if(r.ok){
       try{
         const created=await r.json();
         if(created&&created[0]&&created[0].id){
           savedOrderId=created[0].id;
         } else {
-          // fallback: busca o último pedido (PostgREST usa order= não ordem=)
           const res=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos?select=id&order=criado_em.desc&limit=1&cliente_whats=eq.${encodeURIComponent(clienteWhats)}`,{headers:H});
           const rows=await res.json();
           if(rows&&rows[0]) savedOrderId=rows[0].id;
         }
       }catch(e2){console.warn('Erro ao obter ID do pedido:',e2);}
-    } else {
-      const err=await r.text();
-      console.warn('omi_pedidos error:',r.status,err);
     }
   }catch(e){console.warn('Erro ao salvar pedido:',e);}
 
