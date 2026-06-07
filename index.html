@@ -930,13 +930,17 @@ ${itensLinha}
 
 ${valoresLinha}
 
-Como vai preferir pagar?`;
+Deseja adicionar algo mais? Se estiver tudo certo, escolha a forma de pagamento.`;
 
   // Sincroniza CROMI do Supabase antes de montar o pedido (garante cashback atualizado)
   if(clienteWhats){
     try{ await syncClienteSupabase(); }catch(e){}
   }
   limparOMIChat(); // limpa histórico antigo
+  // Define o corte: a partir de agora, só mensagens novas da operação contam
+  omiMsgCorteTs = new Date().toISOString();
+  try{ localStorage.setItem('omi_msg_corte', omiMsgCorteTs); }catch(e){}
+  omiUltimaMsgCount=0;
   omiChatMessages=[{role:'assistant', content:msgResumo, expr: totalPedidosPagos===0?'feliz':'atento'}];
   salvarOMIChat(); // salva novo review antes de abrir
   fecharDrawer();
@@ -952,6 +956,20 @@ function injetarBotoesPagamento(){
   const msgs=document.getElementById('omiChatMsgs');
   if(!msgs) return;
   if(document.getElementById('pagamento-btns')) return;
+
+  // Caixa de observações (sempre visível antes do pagamento)
+  if(!document.getElementById('obs-box')){
+    const obsWrap=document.createElement('div');
+    obsWrap.id='obs-box';
+    obsWrap.style.cssText='margin-top:4px;margin-bottom:10px';
+    obsWrap.innerHTML=`
+      <div style="font-size:.62rem;color:rgba(242,193,46,.7);font-weight:700;letter-spacing:.04em;margin-bottom:5px;font-family:Inter,sans-serif">OBSERVAÇÃO (opcional)</div>
+      <textarea id="obsInput" placeholder="Ex.: quero meu hambúrguer bem passado, sem cebola..." rows="2"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px';if(window._omiPedidoAtual)window._omiPedidoAtual.observacao=this.value.trim()"
+        style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(242,193,46,.22);border-radius:10px;color:#fff;padding:9px 11px;font-size:.82rem;font-family:Inter,sans-serif;resize:none;outline:none;line-height:1.4"></textarea>`;
+    msgs.appendChild(obsWrap);
+  }
+
   const sug=document.createElement('div');
   sug.id='pagamento-btns';
   sug.style.cssText='display:flex;gap:8px;margin-top:4px;flex-wrap:wrap';
@@ -970,11 +988,21 @@ function injetarBotoesPagamento(){
 
 function escolherPagamento(forma){
   omiFlowState=null;
+  // captura a observação digitada antes de remover a caixa
+  const obsEl=document.getElementById('obsInput');
+  if(obsEl&&window._omiPedidoAtual){ window._omiPedidoAtual.observacao=(obsEl.value||'').trim(); }
+  const obsBox=document.getElementById('obs-box');
+  if(obsBox) obsBox.remove();
   const btns=document.getElementById('pagamento-btns');
   if(btns) btns.remove();
+  const addMore=document.getElementById('addmore-btn');
+  if(addMore) addMore.remove();
   const waOpt=document.getElementById('pagamento-wa');
   if(waOpt) waOpt.remove();
   if(window._omiPedidoAtual) window._omiPedidoAtual.forma_pagamento=forma;
+  // Registra a observação no chat (se houver)
+  const _obs=window._omiPedidoAtual&&window._omiPedidoAtual.observacao;
+  if(_obs){ omiChatMessages.push({role:'user', content:'📝 '+_obs}); }
   omiChatMessages.push({role:'user', content:forma});
   renderOMIChatMessages();
 
@@ -1128,6 +1156,7 @@ async function encaminharPedidoFinal(canal){
       taxa: p.taxa!=null?p.taxa:1.99,
       forma_pagamento: p.forma_pagamento||null,
       troco: p.troco||null,
+      observacao: p.observacao||null,
       conversa_id: omiConvId||null,
       status: 'novo',
       criado_em: new Date().toISOString(),
@@ -1673,17 +1702,29 @@ async function enviarMsgOperacao(){
 async function pollKitchenMsgs(){
   if(!omiConvId) return;
   try{
+    // 1) Verifica se a operação LEU (nao_lidas==0 na conversa) -> marca msgs como Visualizado
+    try{
+      const rc=await fetch(`${SUPA_URL}/rest/v1/omi_conversas?id=eq.${omiConvId}&select=nao_lidas`,{headers:H});
+      const cv=await rc.json();
+      if(cv&&cv[0]&&Number(cv[0].nao_lidas)===0){
+        let mudou=false;
+        omiChatMessages.forEach(x=>{
+          if(x.canal==='operacao'&&x.status==='enviada'){x.status='respondida';mudou=true;}
+        });
+        if(mudou){ salvarOMIChat(); renderOMIChatMessages(); }
+      }
+    }catch(e){}
+    // 2) Busca respostas da operação (mensagens admin) e adiciona como bolhas
     const r=await fetch(`${SUPA_URL}/rest/v1/omi_mensagens?conversa_id=eq.${omiConvId}&autor=eq.admin&order=criado_em.asc`,{headers:H});
     const lista=await r.json();
     if(!lista||!lista.length) return;
     let novas=false;
     lista.forEach(m=>{
-      // já existe essa resposta da operação no chat?
+      if(omiMsgCorteTs && m.criado_em && m.criado_em < omiMsgCorteTs) return;
       const existe=omiChatMessages.some(x=>x.canal==='operacao-resp'&&x.content===m.conteudo);
       if(!existe){
         omiChatMessages.push({canal:'operacao-resp',content:m.conteudo});
         novas=true;
-        // marca a última msg do cliente à operação como 'respondida' (🟢)
         for(let k=omiChatMessages.length-1;k>=0;k--){
           if(omiChatMessages[k].canal==='operacao'&&omiChatMessages[k].status==='enviada'){
             omiChatMessages[k].status='respondida';
@@ -1729,14 +1770,11 @@ function iniciarPollPedido(orderId){
       if(novoStatus!==omiActiveOrderStatus){
         omiActiveOrderStatus=novoStatus;
         mostrarTrackingBubble(novoStatus);
-        const msgStatus=OMI_STATUS_MSGS[novoStatus]||'';
-        // Atualiza card de tracking no chat
+        // Atualiza APENAS o card de tracking no chat (sem mensagem de texto duplicada,
+        // pois o card já mostra o status visualmente)
         const _tm=omiChatMessages.find(m=>m.type==='tracking');
         if(_tm){
           _tm.status=novoStatus;
-        } else {
-          // Se não há card, adiciona mensagem de texto
-          omiChatMessages.push({role:'assistant',content:msgStatus,expr:novoStatus==='entregue'?'feliz':'atento'});
         }
         salvarOMIChat();
         // Re-renderiza apenas se o chat está aberto
@@ -1779,6 +1817,9 @@ function iniciarPollPedido(orderId){
   omiPollTimer=setInterval(function(){_tickPoll();omiPollMensagens();},5000);
 }
 let omiUltimaMsgCount=0;
+// Timestamp de corte: só mensagens da operação DEPOIS deste instante aparecem
+// (evita acumular mensagens de pedidos anteriores na mesma conversa)
+let omiMsgCorteTs = localStorage.getItem('omi_msg_corte') || null;
 
 async function omiPollMensagens(){
   if(!omiConvId||!clienteWhats) return;
@@ -1791,7 +1832,7 @@ async function omiPollMensagens(){
     if(msgs.length>omiUltimaMsgCount){
       omiUltimaMsgCount=msgs.length;
       // Adiciona mensagens novas do admin ao chat
-      const novas=msgs.filter(m=>m.autor==='admin'||m.autor==='omi');
+      const novas=msgs.filter(m=>(m.autor==='admin'||m.autor==='omi') && !(omiMsgCorteTs && m.criado_em && m.criado_em < omiMsgCorteTs));
       novas.forEach(m=>{
         const jaExiste=omiChatMessages.some(cm=>cm._id===m.id);
         if(!jaExiste&&m.conteudo){
@@ -1945,8 +1986,8 @@ function renderOMIChatMessages() {
     } else if(m.canal === 'operacao'){
       // Mensagem do cliente para a operação (estilo WhatsApp, com status)
       const statusDot = m.status==='respondida'
-        ? '<span style="color:#4ade80">🟢 respondida</span>'
-        : '<span style="color:#f7c948">🟡 enviada</span>';
+        ? '<span style="color:#4ade80">🟢 Visualizado</span>'
+        : '<span style="color:#f7c948">🟡 Enviado</span>';
       html += `<div class="omi-cm-bubble user"><div>${m.content.replace(/\n/g,'<br>')}</div><div class="omi-op-status">${statusDot}</div></div>`;
     } else if(m.canal === 'operacao-resp'){
       // Resposta da operação
