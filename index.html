@@ -1757,14 +1757,6 @@ async function pollKitchenMsgs(){
 
 function onOmiFloatTap(){
   openOMIChat();
-  if(omiActiveOrderStatus&&omiActiveOrderStatus!=='novo'){
-    const msg=OMI_STATUS_MSGS[omiActiveOrderStatus]||'';
-    const last=omiChatMessages[omiChatMessages.length-1];
-    if(!last||last.content!==msg){
-      omiChatMessages.push({role:'assistant',content:msg,expr:'feliz'});
-      renderOMIChatMessages();
-    }
-  }
 }
 
 function abrirOMITracking(){ onOmiFloatTap(); }
