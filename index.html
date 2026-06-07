@@ -963,8 +963,8 @@ function injetarBotoesPagamento(){
     obsWrap.id='obs-box';
     obsWrap.style.cssText='margin-top:4px;margin-bottom:10px';
     obsWrap.innerHTML=`
-      <div style="font-size:.62rem;color:rgba(242,193,46,.7);font-weight:700;letter-spacing:.04em;margin-bottom:5px;font-family:Inter,sans-serif">OBSERVAÇÃO (opcional)</div>
-      <textarea id="obsInput" placeholder="Ex.: quero meu hambúrguer bem passado, sem cebola..." rows="2"
+      <div style="font-size:.62rem;color:rgba(242,193,46,.7);font-weight:700;letter-spacing:.04em;margin-bottom:5px;font-family:Inter,sans-serif">OBSERVAÇÃO / PEDIDO ESPECIAL (opcional)</div>
+      <textarea id="obsInput" placeholder="Ex.: adicionar um refri 350ml, hambúrguer bem passado, meu endereço mudou para..." rows="2"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px';if(window._omiPedidoAtual)window._omiPedidoAtual.observacao=this.value.trim()"
         style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(242,193,46,.22);border-radius:10px;color:#fff;padding:9px 11px;font-size:.82rem;font-family:Inter,sans-serif;resize:none;outline:none;line-height:1.4"></textarea>`;
     msgs.appendChild(obsWrap);
@@ -1733,9 +1733,10 @@ async function pollKitchenMsgs(){
     let novas=false;
     lista.forEach(m=>{
       if(omiMsgCorteTs && m.criado_em && m.criado_em < omiMsgCorteTs) return;
-      const existe=omiChatMessages.some(x=>x.canal==='operacao-resp'&&x.content===m.conteudo);
+      // dedup por ID único da mensagem (permite respostas iguais legítimas como "Sim")
+      const existe=omiChatMessages.some(x=>x.canal==='operacao-resp'&&x._id===m.id);
       if(!existe){
-        omiChatMessages.push({canal:'operacao-resp',content:m.conteudo});
+        omiChatMessages.push({canal:'operacao-resp',content:m.conteudo,_id:m.id});
         novas=true;
         for(let k=omiChatMessages.length-1;k>=0;k--){
           if(omiChatMessages[k].canal==='operacao'&&omiChatMessages[k].status==='enviada'){
@@ -1828,25 +1829,10 @@ let omiMsgCorteTs = localStorage.getItem('omi_msg_corte') || null;
 async function omiPollMensagens(){
   if(!omiConvId||!clienteWhats) return;
   try{
-    const r=await fetch(`${SUPA_URL}/rest/v1/omi_mensagens?conversa_id=eq.${omiConvId}&order=criado_em.asc`,{
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
-    });
-    if(!r.ok) return;
-    const msgs=await r.json();
-    if(msgs.length>omiUltimaMsgCount){
-      omiUltimaMsgCount=msgs.length;
-      // Adiciona mensagens novas do admin ao chat
-      const novas=msgs.filter(m=>(m.autor==='admin'||m.autor==='omi') && !(omiMsgCorteTs && m.criado_em && m.criado_em < omiMsgCorteTs));
-      novas.forEach(m=>{
-        const jaExiste=omiChatMessages.some(cm=>cm._id===m.id);
-        if(!jaExiste&&m.conteudo){
-          omiChatMessages.push({role:'assistant',content:m.conteudo,expr:'atento',_id:m.id});
-        }
-      });
-      renderOMIChatMessages();
-      // Sync cliente para atualizar selos
-      await syncClienteSupabase();
-    }
+    // Este poll cuida APENAS do sync de selos/fidelidade.
+    // As respostas da operação são tratadas exclusivamente por pollKitchenMsgs
+    // (evita duplicação da mesma mensagem no chat).
+    await syncClienteSupabase();
   }catch(e){}
 }
 
