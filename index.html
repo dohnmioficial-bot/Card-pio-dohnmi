@@ -726,7 +726,7 @@ function getDescontoAutomatico(){
 function getBagItems(){return Object.values(bag).filter(i=>i.qty>0)}
 function getBagCount(){return getBagItems().reduce((s,i)=>s+i.qty,0)}
 function getBagSubtotal(){return getBagItems().reduce((s,i)=>s+(i.preco*i.qty),0)}
-function getBagTotal(){let s=getBagSubtotal();if(!membroCoroa&&descontoAtivo&&!descontoUsado)s*=0.9;s-=getDescontoAutomatico();s+=getTaxaEntrega();return Math.max(0,s)}
+function getBagTotal(){let s=getBagSubtotal();s-=getDescontoAutomatico();s+=getTaxaEntrega();return Math.max(0,s)}
 function addToBag(id,nome,preco,sub){if(!bag[id])bag[id]={id,nome,preco,qty:0,sub:sub||''};bag[id].qty++;updateBagBar();if(isDrawerOpen)renderDrawer()}
 function setQty(id,delta){if(!bag[id])return;bag[id].qty=Math.max(0,bag[id].qty+delta);if(bag[id].qty===0)delete bag[id];updateBagBar();if(isDrawerOpen)renderDrawer()}
 function clearBag(){bag={};updateBagBar();document.querySelectorAll('.bc.selected,.rc.selected,.mc.selected,.cc.selected').forEach(el=>el.classList.remove('selected'));document.querySelectorAll('.qty-num').forEach(el=>el.textContent='1');hamburgers.forEach(b=>{const s=document.getElementById('tb-s-'+b.id),d=document.getElementById('tb-d-'+b.id);if(s&&d){s.classList.add('active');d.classList.remove('active');}})}
@@ -804,7 +804,7 @@ function renderDrawer(){
  let html=`<div class="omi-float"><img class="omi-char" src="${omiExpr(totalPedidosPagos)}" alt="O-Mi"><div class="omi-speech-col"><div class="omi-speech-top"><span class="omi-brand">O-Mi Wave</span><span class="omi-pill ${membroCoroa?'vip':''}">${pill}</span></div><div class="omi-msg">${omiMsg(clienteNome||'Cidadão',totalPedidosPagos)}</div></div></div>`;
  items.forEach((item,i)=>{html+=`<div class="drawer-item"><div class="di-num">${String(i+1).padStart(2,'0')}</div><div class="di-info"><div class="di-tipo">${tipoLabel(item.id)}</div><div class="di-name">${item.nome}</div>${item.sub?`<div class="di-sub">${item.sub}</div>`:''}</div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="qty-btn" onclick="setQty('${item.id}',-1)">−</button><span class="qty-num">${item.qty}</span><button class="qty-btn" onclick="setQty('${item.id}',1)">+</button><div class="di-price">${fmtVal(item.preco*item.qty)}</div></div></div>`;});
  html+='<div class="drawer-divider"></div>';
- if(temDesc)html+=`<div class="drawer-row"><span>Subtotal</span><span>${fmtVal(sub)}</span></div><div class="drawer-row desc-row"><span> Desconto −10%</span><span>−${fmtVal(sub*0.1)}</span></div>`;
+ if(temDesc)html+=`<div class="drawer-row desc-row"><span>🎁 Refri 350ml grátis (1º pedido)</span><span>GRÁTIS</span></div>`;
  if(descAuto>0){const _hjD=new Date(),_anivD=clienteAniv?((_hjD.getDate()===parseInt((clienteAniv.split('/')||[])[0]))&&((_hjD.getMonth()+1)===parseInt((clienteAniv.split('/')||[])[1]))):false;
 const lbl=premioHamburguerPendente?' Hambúrguer grátis!':premioComboPendente?' Combo grátis!':_anivD?' Aniversário! 🎂 R$11,90':' Cashback ativo!';html+=`<div class="cashback-box"><div class="cashback-label">${lbl}</div><div class="cashback-calc">${fmtVal(temDesc?sub*0.9:sub)} − ${fmtVal(descAuto)}</div></div>`;}
  if(!membroCoroa)html+=`<div class="drawer-row"><span> Taxa de entrega</span><span>R$ 1,99</span></div>`;
@@ -860,6 +860,8 @@ async function finalizarPedidoOMI(){
   const orderId=gerarId();
   const snap=items.map(i=>({id:i.id,nome:i.nome,qty:i.qty,preco:i.preco,sub:i.sub||''}));
   const nome1=clienteNome.split(' ')[0];
+  // Brinde de primeiro pedido: aviso para a operação incluir o refri grátis
+  const _brindeRefri = (!membroCoroa && descontoAtivo && !descontoUsado) ? '🎁 BRINDE 1º PEDIDO: incluir Refri 350ml GRÁTIS' : '';
 
   // Salva rascunho do pedido (status 'rascunho' até o cliente confirmar)
   window._omiPedidoAtual = {
@@ -871,6 +873,7 @@ async function finalizarPedidoOMI(){
     subtotal: sub,
     desconto: Math.max(0, sub + getTaxaEntrega() - total),
     taxa: getTaxaEntrega(),
+    _brindeRefri: _brindeRefri,
     status: 'novo'
   };
 
@@ -905,7 +908,7 @@ async function finalizarPedidoOMI(){
 
   // Monta valores
   let valoresLinha = '';
-  if(temDesc) valoresLinha += `Subtotal: ${fmtVal(sub)}\nDesconto −10%: −${fmtVal(sub*0.1)}\n`;
+  if(temDesc) valoresLinha += `🎁 Refri 350ml GRÁTIS no seu 1º pedido!\n`;
   if(descAuto>0){
     const _hj2=new Date(),_diaA2=clienteAniv?(_hj2.getDate()===parseInt((clienteAniv.split('/')||[])[0])&&(_hj2.getMonth()+1)===parseInt((clienteAniv.split('/')||[])[1])):false;
     const lbl = premioHamburguerPendente?'Hambúrguer grátis':premioComboPendente?'Combo grátis':_diaA2?'Aniversário 🎂':'Cashback CROMI';
@@ -1156,7 +1159,7 @@ async function encaminharPedidoFinal(canal){
       taxa: p.taxa!=null?p.taxa:1.99,
       forma_pagamento: p.forma_pagamento||null,
       troco: p.troco||null,
-      observacao: p.observacao||null,
+      observacao: [p._brindeRefri, p.observacao].filter(Boolean).join(' | ')||null,
       conversa_id: omiConvId||null,
       status: 'novo',
       criado_em: new Date().toISOString(),
@@ -1320,7 +1323,7 @@ async function finalizarPedido(){
   const fmtV=v=>'R$ '+v.toFixed(2).replace('.',',');
   let linhasItens=items.map(function(i){return '- '+i.qty+'x '+i.nome+(i.sub?' ('+i.sub+')':'')+' - '+fmtV(i.preco*i.qty);}).join('\n');
   let valoresLinha='Subtotal: '+fmtV(sub)+'\n';
-  if(temDesc) valoresLinha+='Desconto -10%: -'+fmtV(sub*0.1)+'\n';
+  if(temDesc) valoresLinha+='Refri 350ml GRATIS no 1o pedido\n';
   if(descAuto>0&&!temDesc){
     var lblWa=premioHamburguerPendente?'Hamburguer gratis':premioComboPendente?'Combo gratis':'Cashback CROMI';
     valoresLinha+=lblWa+': -'+fmtV(descAuto)+'\n';
@@ -1450,7 +1453,7 @@ function buildOMIContext() {
     if (clienteAniv) ctx += `- Aniversário: ${clienteAniv}\n`;
     if (clienteEnd) ctx += `- Endereço: ${clienteEnd}\n`;
     if (favorito && nomeFav[favorito]) ctx += `- Favorito histórico: ${nomeFav[favorito]}\n`;
-    if (temDesc) ctx += `- Desconto ativo: -10% neste pedido\n`;
+    if (temDesc) ctx += `- Brinde ativo: Refri 350ml gratis no 1o pedido\n`;
   } else {
     ctx += `CIDADÃO: Não identificado (primeira visita ou não cadastrado)\n`;
   }
@@ -1520,7 +1523,7 @@ Batatas: 150g R$12,90 · 300g R$17,90
 Combos: SOBERANO R$26,90 · MONARCA R$39,90 · IMPÉRIO R$49,90 · DAME R$22,90
 
 SISTEMA DE FIDELIDADE
-FASE 1 — CADASTRO: 10% de desconto no 1º pedido. Uso único.
+FASE 1 — CADASTRO: Refri 350ml grátis no 1º pedido. Uso único.
 
 FASE 2 — JORNADA (12 pedidos):
 - Taxa de entrega: R$1,99 por pedido
@@ -2224,7 +2227,7 @@ function htmlCupom(){
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M13 2L4.5 13H11L10 22L19.5 11H13L13 2Z" fill="#F2C12E"/></svg>
         </div>
         <div class="plano-label">ATIVAÇÃO</div>
-        <div class="plano-row"><div class="plano-row-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="#F2C12E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="7" y1="7" x2="7.01" y2="7" stroke="#F2C12E" stroke-width="2" stroke-linecap="round"/></svg></div><div class="plano-row-txt">-10% OFF</div></div>
+        <div class="plano-row"><div class="plano-row-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="#F2C12E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="7" y1="7" x2="7.01" y2="7" stroke="#F2C12E" stroke-width="2" stroke-linecap="round"/></svg></div><div class="plano-row-txt">REFRI 350ml GRÁTIS no 1º pedido</div></div>
         <div class="plano-row"><div class="plano-row-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="11" rx="2" stroke="#F2C12E" stroke-width="2"/><path d="M12 16v2M8 11V7a4 4 0 018 0v4" stroke="#F2C12E" stroke-width="2" stroke-linecap="round"/></svg></div><div class="plano-row-txt">Acesso DOHN'MI</div></div>
       </div>
       <div class="plano-card">
@@ -2272,7 +2275,7 @@ function htmlCadastro(){
       <button class="form-back" onclick="fase='cupom';renderCardContent()">← Voltar</button>
       <div class="form-title">Novo Cidadão</div>
     </div>
-    <div class="form-subtitle">Cadastre-se uma vez e acesse de qualquer dispositivo. Seu desconto de −10% é ativado agora.</div>
+    <div class="form-subtitle">Cadastre-se uma vez e acesse de qualquer dispositivo. Seu Refri 350ml grátis no 1º pedido é ativado agora.</div>
     <div class="form-porque">
       <div class="fp-titulo">Por que preencher?</div>
       <div class="fp-texto">Seus dados ativam o desconto, registram seu CROMI e suas recompensas, e garantem que sua entrega chegue certinho. <b>Preencha com informações corretas</b> — é com elas que reconhecemos você e protegemos seus benefícios.</div>
@@ -2542,7 +2545,7 @@ descontoUsado=(_pedidosAnteriores>0)?!!(clienteExistente?.desconto_usado):false;
   const _ci=gerarCodigoImperial(clienteAniv,clienteWhats);
   supaSave(_ci);
   fase='jornada';renderCardContent();
-  showToast(' Cadastro ativo! −10% no próximo pedido');}
+  showToast('Cadastro ativo! Refri 350ml grátis no 1º pedido');}
 function gerarCodigoImperial(aniv, whats){
   if(!aniv||!whats) return null;
   const pts=aniv.split('/');
