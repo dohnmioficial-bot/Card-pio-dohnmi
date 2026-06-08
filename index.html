@@ -2311,7 +2311,7 @@ function buildConvTrigger(){
   const p=totalPedidosPagos+1; // próximo pedido
   // 0) Brinde de 1º pedido — Refri 350ml grátis (cliente novo)
   if(!membroCoroa && descontoAtivo && !descontoUsado)
-    return `<div class="conv-trigger hot"><div class="ct-txt"><div class="ct-big">🥤 Refri 350ml grátis no seu 1º pedido!</div><div class="ct-sub">Já cadastrado — é só pedir que a gente manda o refri.</div></div></div>`;
+    return `<div class="conv-trigger hot"><div class="ct-txt"><div class="ct-big">Refri 350ml grátis no seu 1º pedido!</div><div class="ct-sub">Já cadastrado — é só pedir que a gente manda o refri.</div></div></div>`;
   // 1) Prêmio JÁ disponível — máxima urgência
   if(premioHamburguerPendente)
     return `<div class="conv-trigger hot"><div class="ct-txt"><div class="ct-big">Hambúrguer grátis te esperando!</div><div class="ct-sub">É só fazer seu próximo pedido — aplico sozinho.</div></div></div>`;
