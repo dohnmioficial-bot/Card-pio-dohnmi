@@ -2309,6 +2309,9 @@ function htmlCadastro(){
 // Tudo baseado no estado real (sincronizado do admin). Ordem = prioridade de impacto.
 function buildConvTrigger(){
   const p=totalPedidosPagos+1; // próximo pedido
+  // 0) Brinde de 1º pedido — Refri 350ml grátis (cliente novo)
+  if(!membroCoroa && descontoAtivo && !descontoUsado)
+    return `<div class="conv-trigger hot"><div class="ct-txt"><div class="ct-big">🥤 Refri 350ml grátis no seu 1º pedido!</div><div class="ct-sub">Já cadastrado — é só pedir que a gente manda o refri.</div></div></div>`;
   // 1) Prêmio JÁ disponível — máxima urgência
   if(premioHamburguerPendente)
     return `<div class="conv-trigger hot"><div class="ct-txt"><div class="ct-big">Hambúrguer grátis te esperando!</div><div class="ct-sub">É só fazer seu próximo pedido — aplico sozinho.</div></div></div>`;
@@ -2343,7 +2346,7 @@ function buildConvTrigger(){
 
 function htmlJornada(){
  const p=totalPedidosPagos+1;
- const descTag=(descontoAtivo&&!descontoUsado)?`<div class="desconto-tag"> −10% ATIVO</div>`:'';
+ const descTag='';
  const PEDIDOS=[{n:1,t:'n'},{n:2,t:'n'},{n:3,t:'n'},{n:4,t:'c'},{n:5,t:'b'},{n:6,t:'b'},{n:7,t:'p',icon:''},{n:8,t:'n'},{n:9,t:'n'},{n:10,t:'c'},{n:11,t:'b'},{n:12,t:'p',icon:''}];
  const buildSlot=(info)=>{
   const feito=totalPedidosPagos>=info.n,atual=p===info.n;
