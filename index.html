@@ -709,7 +709,11 @@ function getDescontoAutomatico(){
    if(clienteAniv){const _pts=clienteAniv.split('/');if(_pts.length>=2)_diaAniv=_hj.getDate()===parseInt(_pts[0])&&(_hj.getMonth()+1)===parseInt(_pts[1]);}
    let d=0;
    if(_diaAniv) d+=11.90;                              // 🎂 Aniversário: R$11,90 fixo
-   if(_dataEsp&&cromiAcumulado>0) d+=cromiAcumulado*2; // 🎉 Data especial: CROMI × 2
+   if(_dataEsp&&cromiAcumulado>0){
+     d+=cromiAcumulado*2; // 🎉 Data especial: CROMI × 2
+     // Regra de zeragem: pedidos 1–4 não zeram, 5+ zeram
+     if(totalPedidosPagos>=5) window._cromiDobroZeraAposEntrega=true;
+   }
    else if(!_diaAniv&&cromiAcumulado>=11.89) d+=11.90; // cashback normal membro
    return Math.min(d,sub);
  }
@@ -1087,6 +1091,16 @@ function confirmarPagamentoOMI(troco){
 
   omiChatMessages.push({role:'assistant', content:confirmMsg, expr:'feliz'});
   omiFlowState='encaminhar';
+
+  // Aviso de data especial/aniversário após pagamento (Membro da Coroa)
+  if(membroCoroa){
+    const aviso=omiGetAvisoDataEspecial();
+    if(aviso) setTimeout(()=>{
+      omiChatMessages.push({role:'assistant',content:aviso,expr:'feliz'});
+      renderOMIChatMessages();
+    },600);
+  }
+
   renderOMIChatMessages();
   setTimeout(()=>{ injetarBotoesEncaminhar(); },300);
 }
@@ -1213,6 +1227,16 @@ async function encaminharPedidoFinal(canal){
         body:JSON.stringify({desconto_usado:true})
       }).catch(()=>{});
     }
+  }
+  // Zera CROMI se dobro foi usado em data especial a partir do 5º pedido
+  if(window._cromiDobroZeraAposEntrega&&clienteWhats){
+    window._cromiDobroZeraAposEntrega=false;
+    cromiAcumulado=0;
+    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({cromi_acumulado:0})
+    }).catch(()=>{});
   }
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
   orders.unshift({data:new Date().toISOString(),itens:JSON.parse(p.itens||'[]'),status:'recebido',pagamentoConfirmado:false,avaliado:false});
@@ -1343,6 +1367,17 @@ async function finalizarPedido(){
         body:JSON.stringify({desconto_usado:true})
       }).catch(()=>{});
     }
+  }
+  // Zera CROMI se dobro foi usado em data especial a partir do 5º pedido
+  if(window._cromiDobroZeraAposEntrega&&clienteWhats){
+    window._cromiDobroZeraAposEntrega=false;
+    cromiAcumulado=0;
+    salvar();
+    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({cromi_acumulado:0})
+    }).catch(()=>{});
   }
   // Não chama supaSave() — fidelidade é escrita só pela operação no ENTREGUE.
   salvar();
@@ -1860,34 +1895,25 @@ async function garantirConversa(){
 }
 
 
-// ── AVISO PROATIVO D-3/D-2/D-1 — Membro da Coroa ──
-function omiAvisoDataEspecial(){
-  if(!membroCoroa) return;
+// ── AVISO PROATIVO D-3/D-2/D-1 e D-0 — Membro da Coroa ──
+// Retorna a mensagem mais relevante ou null
+function omiGetAvisoDataEspecial(){
+  if(!membroCoroa) return null;
   const _hj=new Date();
   const nome1=(clienteNome||'').split(' ')[0]||'cidadão';
 
-  // Calcula dias até uma data alvo (DD/MM ou Date)
   function diasAte(dia,mes){
     const ano=_hj.getFullYear();
     let alvo=new Date(ano,mes-1,dia);
-    if(alvo<_hj) alvo=new Date(ano+1,mes-1,dia);
+    if(alvo<new Date(_hj.getFullYear(),_hj.getMonth(),_hj.getDate())) alvo=new Date(ano+1,mes-1,dia);
     return Math.round((alvo-new Date(_hj.getFullYear(),_hj.getMonth(),_hj.getDate()))/(86400000));
   }
-
-  // Calcula data do N-ésimo domingo do mês
   function nthSunday(mes,n){
-    const ano=_hj.getFullYear();
-    let c=0;
-    for(let d=1;d<=31;d++){
-      const dt=new Date(ano,mes-1,d);
-      if(dt.getMonth()!==mes-1) break;
-      if(dt.getDay()===0) c++;
-      if(c===n) return {dia:d,mes};
-    }
+    const ano=_hj.getFullYear();let c=0;
+    for(let d=1;d<=31;d++){const dt=new Date(ano,mes-1,d);if(dt.getMonth()!==mes-1)break;if(dt.getDay()===0)c++;if(c===n)return{dia:d,mes};}
     return null;
   }
 
-  // Coleta todas as datas especiais relevantes
   const alertas=[];
 
   // Aniversário
@@ -1895,7 +1921,7 @@ function omiAvisoDataEspecial(){
     const pts=clienteAniv.split('/');
     if(pts.length>=2){
       const d=diasAte(parseInt(pts[0]),parseInt(pts[1]));
-      if(d>=0&&d<=3) alertas.push({tipo:'aniv',dias:d,
+      if(d>=0&&d<=3) alertas.push({dias:d,
         msg:d===0
           ? `🎂 Feliz aniversário, ${nome1}! 👑 Hoje, o Império celebra a sua história. Seu presente já está ativo: R$ 11,90 em bônus para tornar este dia ainda mais especial. 🍔`
           : d===1
@@ -1906,51 +1932,53 @@ function omiAvisoDataEspecial(){
   }
 
   // Datas fixas
-  const fixas=[
-    {dia:12,mes:6,nome:'Dia dos Namorados',emoji:'💑'},
-    {dia:12,mes:10,nome:'Dia das Crianças',emoji:'👶'},
-  ];
-  fixas.forEach(({dia,mes,nome,emoji})=>{
+  [{dia:12,mes:6,nome:'Dia dos Namorados',emoji:'💑',
+    d0:'💑 Hoje é dia de celebrar os laços que tornam a vida mais especial. 👑 Seu CROMI vale em dobro. Aproveite. ❤️'},
+   {dia:12,mes:10,nome:'Dia das Crianças',emoji:'👶',
+    d0:'👶 Hoje é dia de celebrar a alegria dos pequenos momentos. 👑 Seu CROMI vale em dobro. Aproveite. 🎉'}
+  ].forEach(({dia,mes,nome,emoji,d0})=>{
     const d=diasAte(dia,mes);
-    const msgD0namorados=`💑 Hoje é dia de celebrar os laços que tornam a vida mais especial. 👑 Seu CROMI vale em dobro. Aproveite. ❤️`;
-    const msgD0criancas=`👶 Hoje é dia de celebrar a alegria dos pequenos momentos. 👑 Seu CROMI vale em dobro. Aproveite. 🎉`;
-    const msgD0=nome==='Dia dos Namorados'?msgD0namorados:msgD0criancas;
-    if(d>=0&&d<=3) alertas.push({tipo:'especial',dias:d,
-      msg:d===0
-        ? msgD0
-        : d===1
-        ? `${emoji} ${nome1}, amanhã é ${nome}! Seu CROMI acumulado vale o dobro de desconto no pedido de amanhã. Aproveite! 👑`
-        : `${emoji} ${nome1}, daqui ${d} dias é ${nome}! Seu CROMI acumulado valerá o dobro — uma recompensa imperial para a data. 👑`
+    if(d>=0&&d<=3) alertas.push({dias:d,
+      msg:d===0?d0
+        :d===1?`${emoji} ${nome1}, amanhã é ${nome}! Seu CROMI acumulado vale o dobro de desconto no pedido de amanhã. Aproveite! 👑`
+        :`${emoji} ${nome1}, daqui ${d} dias é ${nome}! Seu CROMI acumulado valerá o dobro — uma recompensa imperial para a data. 👑`
     });
   });
 
-  // Datas móveis
+  // Mães
   const maes=nthSunday(5,2);
-  if(maes){const d=diasAte(maes.dia,maes.mes);if(d>=0&&d<=3) alertas.push({tipo:'especial',dias:d,
-    msg:d===0?`👩 Hoje é dia de reconhecer o amor e o cuidado que transformam vidas. 👑 Seu CROMI vale em dobro. Aproveite. 🌷`
-    :d===1?`👩 ${nome1}, amanhã é Dia das Mães! Seu CROMI vale o dobro amanhã. Um presente do Império para a data mais especial. 👑`
-    :`👩 ${nome1}, daqui ${d} dias é Dia das Mães! Seu CROMI acumulado valerá o dobro — celebre com desconto imperial. 👑`
+  if(maes){const d=diasAte(maes.dia,maes.mes);if(d>=0&&d<=3) alertas.push({dias:d,
+    msg:d===0?'👩 Hoje é dia de reconhecer o amor e o cuidado que transformam vidas. 👑 Seu CROMI vale em dobro. Aproveite. 🌷'
+      :d===1?`👩 ${nome1}, amanhã é Dia das Mães! Seu CROMI vale o dobro amanhã. Um presente do Império para a data mais especial. 👑`
+      :`👩 ${nome1}, daqui ${d} dias é Dia das Mães! Seu CROMI acumulado valerá o dobro — celebre com desconto imperial. 👑`
   });}
 
+  // Pais
   const pais=nthSunday(8,2);
-  if(pais){const d=diasAte(pais.dia,pais.mes);if(d>=0&&d<=3) alertas.push({tipo:'especial',dias:d,
-    msg:d===0?`👨 Hoje é dia de celebrar os exemplos e os laços que deixam marcas para sempre. 👑 Seu CROMI vale em dobro. Aproveite. 🏆`
-    :d===1?`👨 ${nome1}, amanhã é Dia dos Pais! Seu CROMI vale o dobro amanhã. O Império honra a data. 👑`
-    :`👨 ${nome1}, daqui ${d} dias é Dia dos Pais! Seu CROMI acumulado valerá o dobro — um bônus imperial para a data. 👑`
+  if(pais){const d=diasAte(pais.dia,pais.mes);if(d>=0&&d<=3) alertas.push({dias:d,
+    msg:d===0?'👨 Hoje é dia de celebrar os exemplos e os laços que deixam marcas para sempre. 👑 Seu CROMI vale em dobro. Aproveite. 🏆'
+      :d===1?`👨 ${nome1}, amanhã é Dia dos Pais! Seu CROMI vale o dobro amanhã. O Império honra a data. 👑`
+      :`👨 ${nome1}, daqui ${d} dias é Dia dos Pais! Seu CROMI acumulado valerá o dobro — um bônus imperial para a data. 👑`
   });}
 
-  if(!alertas.length) return;
+  if(!alertas.length) return null;
+  alertas.sort((a,b)=>a.dias-b.dias);
+  return alertas[0].msg;
+}
 
-  // Verifica se já exibiu hoje (evita repetir a cada abertura do chat no mesmo dia)
+function omiAvisoDataEspecial(){
+  if(!membroCoroa) return;
+  const msg=omiGetAvisoDataEspecial();
+  if(!msg) return;
+
+  // Exibe uma vez por dia
+  const _hj=new Date();
   const hoje=`${_hj.getFullYear()}-${_hj.getMonth()}-${_hj.getDate()}`;
   const chave=`omi_aviso_data_${clienteWhats}_${hoje}`;
   try{ if(localStorage.getItem(chave)) return; }catch(e){}
 
-  // Injeta o aviso mais próximo (menor dias)
-  alertas.sort((a,b)=>a.dias-b.dias);
-  const av=alertas[0];
   setTimeout(()=>{
-    omiChatMessages.push({role:'assistant',content:av.msg,expr:'feliz'});
+    omiChatMessages.push({role:'assistant',content:msg,expr:'feliz'});
     renderOMIChatMessages();
     salvarOMIChat();
   },800);
