@@ -1527,10 +1527,10 @@ FASE 1 — CADASTRO: Refri 350ml grátis no 1º pedido. Uso único.
 
 FASE 2 — JORNADA (12 pedidos):
 - Taxa de entrega: R$1,99 por pedido
-- CROMI +R$1,49 nos pedidos 1, 2, 3, 7, 8, 9
-- Cashback automático no 4º pedido: R$5,96 (ativado após o 3º)
-- Cashback automático no 10º pedido: R$4,47 (ativado após o 9º)
-- Após 5ª entrega: hambúrguer simples grátis (R$17,90) — usado no 6º pedido
+- CROMI +R$1,49 nos pedidos 1, 2, 3, 4, 8, 9, 10
+- Cashback automático no 4º pedido: R$5,96 (creditado ao entregar o 4º)
+- Cashback automático no 10º pedido: R$4,47 (creditado ao entregar o 10º)
+- Após 6ª entrega: hambúrguer simples grátis (R$17,90) — usado no 7º pedido
 - Após 11ª entrega: combo grátis (R$26,90) — usado no 12º pedido → vira Membro da Coroa
 
 FASE 3 — MEMBRO DA COROA (vitalício):
@@ -1578,8 +1578,8 @@ async function syncClienteSupabase(){
     const hamb=d.premio_hamburguer||false;
     const combo=d.premio_combo||false;
     const tot=d.total_pedidos||0;
-    premioHamburguerPendente=hamb&&tot<8;
-    premioComboPendente=combo&&tot<13;
+    premioHamburguerPendente=hamb&&tot>=6&&tot<7;
+    premioComboPendente=combo&&tot>=11&&tot<12;
     // Corrige no Supabase se estava errado
     if(hamb&&tot>=7) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
     if(combo&&tot>=12) fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
@@ -1859,6 +1859,96 @@ async function garantirConversa(){
   }catch(e){}
 }
 
+
+// ── AVISO PROATIVO D-3/D-2/D-1 — Membro da Coroa ──
+function omiAvisoDataEspecial(){
+  if(!membroCoroa) return;
+  const _hj=new Date();
+  const nome1=(clienteNome||'').split(' ')[0]||'cidadão';
+
+  // Calcula dias até uma data alvo (DD/MM ou Date)
+  function diasAte(dia,mes){
+    const ano=_hj.getFullYear();
+    let alvo=new Date(ano,mes-1,dia);
+    if(alvo<_hj) alvo=new Date(ano+1,mes-1,dia);
+    return Math.round((alvo-new Date(_hj.getFullYear(),_hj.getMonth(),_hj.getDate()))/(86400000));
+  }
+
+  // Calcula data do N-ésimo domingo do mês
+  function nthSunday(mes,n){
+    const ano=_hj.getFullYear();
+    let c=0;
+    for(let d=1;d<=31;d++){
+      const dt=new Date(ano,mes-1,d);
+      if(dt.getMonth()!==mes-1) break;
+      if(dt.getDay()===0) c++;
+      if(c===n) return {dia:d,mes};
+    }
+    return null;
+  }
+
+  // Coleta todas as datas especiais relevantes
+  const alertas=[];
+
+  // Aniversário
+  if(clienteAniv){
+    const pts=clienteAniv.split('/');
+    if(pts.length>=2){
+      const d=diasAte(parseInt(pts[0]),parseInt(pts[1]));
+      if(d>=1&&d<=3) alertas.push({tipo:'aniv',dias:d,
+        msg:d===1
+          ? `🎂 ${nome1}, amanhã é seu aniversário! Como Membro da Coroa, você ganha R$11,90 de desconto no seu pedido. O Império celebra com você! 👑`
+          : `🎂 ${nome1}, daqui ${d} dias é seu aniversário! Prepare-se — como Membro da Coroa, você recebe R$11,90 de bônus imperial no grande dia. 👑`
+      });
+    }
+  }
+
+  // Datas fixas
+  const fixas=[
+    {dia:12,mes:6,nome:'Dia dos Namorados',emoji:'💑'},
+    {dia:12,mes:10,nome:'Dia das Crianças',emoji:'👶'},
+  ];
+  fixas.forEach(({dia,mes,nome,emoji})=>{
+    const d=diasAte(dia,mes);
+    if(d>=1&&d<=3) alertas.push({tipo:'especial',dias:d,
+      msg:d===1
+        ? `${emoji} ${nome1}, amanhã é ${nome}! Seu CROMI acumulado vale o dobro de desconto no pedido de amanhã. Aproveite! 👑`
+        : `${emoji} ${nome1}, daqui ${d} dias é ${nome}! Seu CROMI acumulado valerá o dobro — uma recompensa imperial para a data. 👑`
+    });
+  });
+
+  // Datas móveis
+  const maes=nthSunday(5,2);
+  if(maes){const d=diasAte(maes.dia,maes.mes);if(d>=1&&d<=3) alertas.push({tipo:'especial',dias:d,
+    msg:d===1?`👩 ${nome1}, amanhã é Dia das Mães! Seu CROMI vale o dobro amanhã. Um presente do Império para a data mais especial. 👑`
+    :`👩 ${nome1}, daqui ${d} dias é Dia das Mães! Seu CROMI acumulado valerá o dobro — celebre com desconto imperial. 👑`
+  });}
+
+  const pais=nthSunday(8,2);
+  if(pais){const d=diasAte(pais.dia,pais.mes);if(d>=1&&d<=3) alertas.push({tipo:'especial',dias:d,
+    msg:d===1?`👨 ${nome1}, amanhã é Dia dos Pais! Seu CROMI vale o dobro amanhã. O Império honra a data. 👑`
+    :`👨 ${nome1}, daqui ${d} dias é Dia dos Pais! Seu CROMI acumulado valerá o dobro — um bônus imperial para a data. 👑`
+  });}
+
+  if(!alertas.length) return;
+
+  // Verifica se já exibiu hoje (evita repetir a cada abertura do chat no mesmo dia)
+  const hoje=`${_hj.getFullYear()}-${_hj.getMonth()}-${_hj.getDate()}`;
+  const chave=`omi_aviso_data_${clienteWhats}_${hoje}`;
+  try{ if(localStorage.getItem(chave)) return; }catch(e){}
+
+  // Injeta o aviso mais próximo (menor dias)
+  alertas.sort((a,b)=>a.dias-b.dias);
+  const av=alertas[0];
+  setTimeout(()=>{
+    omiChatMessages.push({role:'assistant',content:av.msg,expr:'feliz'});
+    renderOMIChatMessages();
+    salvarOMIChat();
+  },800);
+
+  try{ localStorage.setItem(chave,'1'); }catch(e){}
+}
+
 function openOMIChat() {
   // Carrega histórico real de pedidos em background (memória do O-Mi Wave)
   carregarHistoricoCliente();
@@ -1912,6 +2002,9 @@ function openOMIChat() {
       : `Saudações! Sou O-Mi, guardião do Império DOHN'MI. Como posso servir?`;
     omiChatMessages = [{role:'assistant', content:greeting, expr:'feliz'}];
   }
+
+  // Aviso proativo D-3, D-2, D-1 para Membros da Coroa
+  if(membroCoroa) omiAvisoDataEspecial();
 
   renderOMIChatMessages();
 
@@ -2481,8 +2574,8 @@ async function confirmarRetornoCodigo(){
     descontoUsado=d.desconto_usado||false;const hamb=d.premio_hamburguer||false;
     const combo=d.premio_combo||false;
     const tot=d.total_pedidos||0;
-    premioHamburguerPendente=hamb&&tot>=6&&tot<8;
-    premioComboPendente=combo&&tot>=11&&tot<13;
+    premioHamburguerPendente=hamb&&tot>=6&&tot<7;
+    premioComboPendente=combo&&tot>=11&&tot<12;
     // Auto-corrige prêmios com janela errada no Supabase
     if(hamb&&tot>=7)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_hamburguer:false})}).catch(()=>{});
     if(combo&&tot>=12)fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({premio_combo:false})}).catch(()=>{});
