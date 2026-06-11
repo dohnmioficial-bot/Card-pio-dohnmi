@@ -470,6 +470,26 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 .vantagens-titulo{font-size:.65rem;font-weight:900;letter-spacing:.1em;color:var(--gold);margin-bottom:3px}
 .vantagens-desc{font-size:.57rem;color:var(--text2);line-height:1.4}
 .vantagens-arrow{color:rgba(242,193,46,.45);font-size:1.1rem;font-weight:300;flex-shrink:0}
+
+.omi-bubble-especial{
+  font-family:'Cormorant Garamond',serif!important;
+  font-size:1.18rem!important;
+  font-weight:800!important;
+  line-height:1.55!important;
+  letter-spacing:.02em!important;
+  color:var(--gold)!important;
+  background:linear-gradient(135deg,rgba(242,193,46,.11),rgba(242,193,46,.05))!important;
+  border:1px solid rgba(242,193,46,.28)!important;
+  border-left:3px solid var(--gold)!important;
+  border-radius:14px!important;
+  padding:16px 18px!important;
+  text-shadow:0 1px 8px rgba(242,193,46,.18)!important;
+  box-shadow:0 4px 18px rgba(242,193,46,.08)!important;
+}
+.omi-bubble-especial em{
+  font-style:normal;
+  font-weight:900;
+}
 </style>
 </head>
 <body>
@@ -801,6 +821,49 @@ function omiMsg(nome,orders){
   return encorajamento[orders%encorajamento.length];
 }
 
+
+// ── Label do desconto automático ──
+
+// Retorna saudação de data especial para D-0, ou '' se não for data especial hoje
+function getSaudacaoDataEspecial(){
+  if(!membroCoroa) return '';
+  const _hj=new Date(),_dia=_hj.getDate(),_mes=_hj.getMonth()+1,_dow=_hj.getDay();
+  const nome1=(clienteNome||'').split(' ')[0]||'cidadão';
+  let _dataEsp=false, msg='';
+
+  // Aniversário
+  if(clienteAniv){const p=clienteAniv.split('/');if(p.length>=2&&_hj.getDate()===parseInt(p[0])&&_mes===parseInt(p[1])){
+    return `🎂 Feliz aniversário, ${nome1}! 👑 Hoje, o Império celebra a sua história. Seu presente já está ativo: R$ 11,90 em bônus para tornar este dia ainda mais especial. 🍔`;
+  }}
+
+  // Namorados
+  if(_dia===12&&_mes===6) return `💑 Hoje é dia de celebrar os laços que tornam a vida mais especial. 👑 Seu CROMI vale em dobro. Aproveite. ❤️`;
+  // Crianças
+  if(_dia===12&&_mes===10) return `👶 Hoje é dia de celebrar a alegria dos pequenos momentos. 👑 Seu CROMI vale em dobro. Aproveite. 🎉`;
+  // Mães
+  if(_mes===5&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),4,i).getDay()===0)c++;}
+    if(c===2) return `👩 Hoje é dia de reconhecer o amor e o cuidado que transformam vidas. 👑 Seu CROMI vale em dobro. Aproveite. 🌷`;}
+  // Pais
+  if(_mes===8&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),7,i).getDay()===0)c++;}
+    if(c===2) return `👨 Hoje é dia de celebrar os exemplos e os laços que deixam marcas para sempre. 👑 Seu CROMI vale em dobro. Aproveite. 🏆`;}
+  return '';
+}
+
+function getDescontoLabel(curto=false){
+  const _hj=new Date(),_dia=_hj.getDate(),_mes=_hj.getMonth()+1,_dow=_hj.getDay();
+  let _dataEsp=false,_nomeData='';
+  if(_dia===12&&_mes===10){_dataEsp=true;_nomeData='Dia das Crianças';}
+  if(_dia===12&&_mes===6){_dataEsp=true;_nomeData='Dia dos Namorados';}
+  if(_mes===5&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),4,i).getDay()===0)c++;}if(c===2){_dataEsp=true;_nomeData='Dia das Mães';}}
+  if(_mes===8&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),7,i).getDay()===0)c++;}if(c===2){_dataEsp=true;_nomeData='Dia dos Pais';}}
+  let _diaAniv=false;
+  if(clienteAniv){const p=clienteAniv.split('/');if(p.length>=2)_diaAniv=_hj.getDate()===parseInt(p[0])&&_mes===parseInt(p[1]);}
+  if(premioHamburguerPendente) return curto?'🍔 Hambúrguer grátis':'🍔 Hambúrguer grátis';
+  if(premioComboPendente)      return curto?'🎁 Combo grátis':'🎁 Combo grátis';
+  if(_diaAniv)                 return curto?'🎂 Bônus Aniversário':'🎂 Bônus Aniversário R$11,90';
+  if(_dataEsp&&cromiAcumulado>0) return curto?`✨ CROMI ×2 — ${_nomeData}`:`✨ CROMI ×2 — ${_nomeData} (R$ ${(cromiAcumulado*2).toFixed(2).replace('.',',')})`;
+  return curto?'💰 Cashback ativo':'💰 Cashback CROMI';
+}
 function renderDrawer(){
  const body=document.getElementById('drawerBody');const items=getBagItems();if(items.length===0){fecharDrawer();return;}
  const sub=getBagSubtotal(),temDesc=!membroCoroa&&descontoAtivo&&!descontoUsado,descAuto=getDescontoAutomatico(),total=getBagTotal();
@@ -810,7 +873,7 @@ function renderDrawer(){
  html+='<div class="drawer-divider"></div>';
  if(temDesc)html+=`<div class="drawer-row desc-row"><span>🎁 Refri 350ml grátis (1º pedido)</span><span>GRÁTIS</span></div>`;
  if(descAuto>0){const _hjD=new Date(),_anivD=clienteAniv?((_hjD.getDate()===parseInt((clienteAniv.split('/')||[])[0]))&&((_hjD.getMonth()+1)===parseInt((clienteAniv.split('/')||[])[1]))):false;
-const lbl=premioHamburguerPendente?' Hambúrguer grátis!':premioComboPendente?' Combo grátis!':_anivD?' Aniversário! 🎂 R$11,90':' Cashback ativo!';html+=`<div class="cashback-box"><div class="cashback-label">${lbl}</div><div class="cashback-calc">${fmtVal(temDesc?sub*0.9:sub)} − ${fmtVal(descAuto)}</div></div>`;}
+const lbl=getDescontoLabel();html+=`<div class="cashback-box"><div class="cashback-label">${lbl}</div><div class="cashback-calc">${fmtVal(sub)} − ${fmtVal(descAuto)}</div></div>`;}
  if(!membroCoroa)html+=`<div class="drawer-row"><span> Taxa de entrega</span><span>R$ 1,99</span></div>`;
  html+=`<div class="total-box" style="gap:8px"><div class="sh-icon ic-scroll" style="width:28px;height:28px;flex-shrink:0"></div><div class="total-label">TOTAL</div><div class="total-val">${fmtVal(total)}</div></div>`;
  html+=`<div class="split-bar">
@@ -910,16 +973,16 @@ async function finalizarPedidoOMI(){
   // Monta itens do pedido
   const itensLinha = snap.map(i=>`• ${i.qty}× ${i.nome}${i.sub?' ('+i.sub+')':''} — ${fmtVal(i.preco*i.qty)}`).join('\n');
 
-  // Monta valores
+  // Monta valores — breakdown completo
   let valoresLinha = '';
   if(temDesc) valoresLinha += `🎁 Refri 350ml GRÁTIS no seu 1º pedido!\n`;
   if(descAuto>0){
-    const _hj2=new Date(),_diaA2=clienteAniv?(_hj2.getDate()===parseInt((clienteAniv.split('/')||[])[0])&&(_hj2.getMonth()+1)===parseInt((clienteAniv.split('/')||[])[1])):false;
-    const lbl = premioHamburguerPendente?'Hambúrguer grátis':premioComboPendente?'Combo grátis':_diaA2?'Aniversário 🎂':'Cashback CROMI';
+    const lbl = getDescontoLabel();
+    valoresLinha += `Valor: ${fmtVal(sub)}\n`;
     valoresLinha += `${lbl}: −${fmtVal(descAuto)}\n`;
   }
   if(membroCoroa) valoresLinha += `Entrega Grátis 🛵\n`;
-  else valoresLinha += `Taxa de entrega: R$ 1,99\n`;
+  else valoresLinha += `Taxa de entrega: ${fmtVal(1.99)}\n`;
   valoresLinha += `Total: ${fmtVal(total)}`;
 
   const enderecoLinha = clienteEnd
@@ -943,12 +1006,15 @@ Deseja adicionar algo mais? Se estiver tudo certo, escolha a forma de pagamento.
   if(clienteWhats){
     try{ await syncClienteSupabase(); }catch(e){}
   }
-  limparOMIChat(); // limpa histórico antigo
-  // Define o corte: a partir de agora, só mensagens novas da operação contam
+  limparOMIChat();
   omiMsgCorteTs = new Date().toISOString();
   try{ localStorage.setItem('omi_msg_corte', omiMsgCorteTs); }catch(e){}
   omiUltimaMsgCount=0;
+
+  // Monta histórico: saudação especial D-0 ANTES do resumo do pedido
   omiChatMessages=[{role:'assistant', content:msgResumo, expr: totalPedidosPagos===0?'feliz':'atento'}];
+  const _saudEsp = getSaudacaoDataEspecial();
+  if(_saudEsp) omiChatMessages.unshift({role:'assistant', content:_saudEsp, expr:'feliz', especial:true});
   salvarOMIChat(); // salva novo review antes de abrir
   fecharDrawer();
   openOMIChat();
@@ -1235,7 +1301,7 @@ async function encaminharPedidoFinal(canal){
     fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
       method:'PATCH',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({cromi_acumulado:0})
+      body:JSON.stringify({cromi_acumulado:0,cromi_zerar_apos_entrega:false})
     }).catch(()=>{});
   }
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
@@ -1323,6 +1389,8 @@ async function finalizarPedido(){
       forma_pagamento:'WhatsApp',
       conversa_id:omiConvId||null,
       status:'novo',
+      cromi_dobro_usado:!!(window._cromiDobroZeraAposEntrega||false),
+      cromi_zerado:!!(window._cromiDobroZeraAposEntrega&&totalPedidosPagos>=5),
       criado_em:new Date().toISOString(),
       atualizado_em:new Date().toISOString()
     };
@@ -1349,7 +1417,7 @@ async function finalizarPedido(){
   let valoresLinha='Subtotal: '+fmtV(sub)+'\n';
   if(temDesc) valoresLinha+='Refri 350ml GRATIS no 1o pedido\n';
   if(descAuto>0&&!temDesc){
-    var lblWa=premioHamburguerPendente?'Hamburguer gratis':premioComboPendente?'Combo gratis':'Cashback CROMI';
+    var lblWa=getDescontoLabel(true);
     valoresLinha+=lblWa+': -'+fmtV(descAuto)+'\n';
   }
   valoresLinha+='Taxa de entrega: '+(membroCoroa?'Gratis':fmtV(1.99))+'\nTotal: '+fmtV(total);
@@ -2116,7 +2184,8 @@ function renderOMIChatMessages() {
       // Resposta da operação
       html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text"><div style="font-size:.55rem;color:var(--gold);opacity:.7;margin-bottom:2px;font-weight:700">DOHN'MI</div>${m.content.replace(/\n/g,'<br>')}</div></div>`;
     } else if (m.role === 'assistant') {
-      html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text">${m.content.replace(/\n/g,'<br>')}</div></div>`;
+      const _bubbleCls = m.especial ? 'omi-bubble-especial' : '';
+      html += `<div class="omi-cm-bubble omi"><div class="omi-bubble-avatar"><img src="${avatar}" alt="O-Mi"/></div><div class="omi-bubble-text ${_bubbleCls}">${m.content.replace(/\n/g,'<br>')}</div></div>`;
     } else if(m.role === 'user'){
       html += `<div class="omi-cm-bubble user">${m.content.replace(/\n/g,'<br>')}</div>`;
     }
