@@ -1895,8 +1895,10 @@ function omiAvisoDataEspecial(){
     const pts=clienteAniv.split('/');
     if(pts.length>=2){
       const d=diasAte(parseInt(pts[0]),parseInt(pts[1]));
-      if(d>=1&&d<=3) alertas.push({tipo:'aniv',dias:d,
-        msg:d===1
+      if(d>=0&&d<=3) alertas.push({tipo:'aniv',dias:d,
+        msg:d===0
+          ? `🎂 Feliz aniversário, ${nome1}! 👑 Hoje, o Império celebra a sua história. Seu presente já está ativo: R$ 11,90 em bônus para tornar este dia ainda mais especial. 🍔`
+          : d===1
           ? `🎂 ${nome1}, amanhã é seu aniversário! Como Membro da Coroa, você ganha R$11,90 de desconto no seu pedido. O Império celebra com você! 👑`
           : `🎂 ${nome1}, daqui ${d} dias é seu aniversário! Prepare-se — como Membro da Coroa, você recebe R$11,90 de bônus imperial no grande dia. 👑`
       });
@@ -1910,8 +1912,13 @@ function omiAvisoDataEspecial(){
   ];
   fixas.forEach(({dia,mes,nome,emoji})=>{
     const d=diasAte(dia,mes);
-    if(d>=1&&d<=3) alertas.push({tipo:'especial',dias:d,
-      msg:d===1
+    const msgD0namorados=`💑 Hoje é dia de celebrar os laços que tornam a vida mais especial. 👑 Seu CROMI vale em dobro. Aproveite. ❤️`;
+    const msgD0criancas=`👶 Hoje é dia de celebrar a alegria dos pequenos momentos. 👑 Seu CROMI vale em dobro. Aproveite. 🎉`;
+    const msgD0=nome==='Dia dos Namorados'?msgD0namorados:msgD0criancas;
+    if(d>=0&&d<=3) alertas.push({tipo:'especial',dias:d,
+      msg:d===0
+        ? msgD0
+        : d===1
         ? `${emoji} ${nome1}, amanhã é ${nome}! Seu CROMI acumulado vale o dobro de desconto no pedido de amanhã. Aproveite! 👑`
         : `${emoji} ${nome1}, daqui ${d} dias é ${nome}! Seu CROMI acumulado valerá o dobro — uma recompensa imperial para a data. 👑`
     });
@@ -1919,14 +1926,16 @@ function omiAvisoDataEspecial(){
 
   // Datas móveis
   const maes=nthSunday(5,2);
-  if(maes){const d=diasAte(maes.dia,maes.mes);if(d>=1&&d<=3) alertas.push({tipo:'especial',dias:d,
-    msg:d===1?`👩 ${nome1}, amanhã é Dia das Mães! Seu CROMI vale o dobro amanhã. Um presente do Império para a data mais especial. 👑`
+  if(maes){const d=diasAte(maes.dia,maes.mes);if(d>=0&&d<=3) alertas.push({tipo:'especial',dias:d,
+    msg:d===0?`👩 Hoje é dia de reconhecer o amor e o cuidado que transformam vidas. 👑 Seu CROMI vale em dobro. Aproveite. 🌷`
+    :d===1?`👩 ${nome1}, amanhã é Dia das Mães! Seu CROMI vale o dobro amanhã. Um presente do Império para a data mais especial. 👑`
     :`👩 ${nome1}, daqui ${d} dias é Dia das Mães! Seu CROMI acumulado valerá o dobro — celebre com desconto imperial. 👑`
   });}
 
   const pais=nthSunday(8,2);
-  if(pais){const d=diasAte(pais.dia,pais.mes);if(d>=1&&d<=3) alertas.push({tipo:'especial',dias:d,
-    msg:d===1?`👨 ${nome1}, amanhã é Dia dos Pais! Seu CROMI vale o dobro amanhã. O Império honra a data. 👑`
+  if(pais){const d=diasAte(pais.dia,pais.mes);if(d>=0&&d<=3) alertas.push({tipo:'especial',dias:d,
+    msg:d===0?`👨 Hoje é dia de celebrar os exemplos e os laços que deixam marcas para sempre. 👑 Seu CROMI vale em dobro. Aproveite. 🏆`
+    :d===1?`👨 ${nome1}, amanhã é Dia dos Pais! Seu CROMI vale o dobro amanhã. O Império honra a data. 👑`
     :`👨 ${nome1}, daqui ${d} dias é Dia dos Pais! Seu CROMI acumulado valerá o dobro — um bônus imperial para a data. 👑`
   });}
 
