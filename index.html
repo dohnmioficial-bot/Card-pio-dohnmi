@@ -695,10 +695,8 @@ function getTaxaEntrega(){return membroCoroa?0:1.99}
 function getDescontoAutomatico(){
  const sub=getBagSubtotal();
 
- // Auto-corrige prêmios que ficaram travados
- // Hambúrguer grátis = válido APENAS no 8º pedido (após 7º confirmado)
- // Se totalPedidosPagos já passou de 8, o prêmio expirou
- if(premioHamburguerPendente&&totalPedidosPagos>=6){
+ // Auto-corrige prêmios expirados
+ if(premioHamburguerPendente&&totalPedidosPagos>=7){
    premioHamburguerPendente=false;salvar();
    fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
      method:'PATCH',headers:SHJ(),
@@ -751,10 +749,12 @@ function getDescontoAutomatico(){
  }
  // Jornada — sem bônus de datas especiais
  let d=0;
- // Cashback baseado em cromiAcumulado já sincronizado (sem projeção — elimina delay)
- // Admin faz bump para 5,96 após pedido 3 e valor natural 4,47 após pedido 9
- if(cromiAcumulado>=5.95) d+=5.96;        // cashback 1: ativo após pedido 3 entregue
- else if(cromiAcumulado>=4.46&&totalPedidosPagos>=7) d+=4.47; // cashback 2: ativo após pedido 9
+ // Cashback sincronizado pelo admin no ENTREGUE
+ if(cromiAcumulado>=5.95) d+=5.96;       // cashback 1: R$5,96 (ativo após pedido 3)
+ else if(cromiAcumulado>=4.46) d+=4.47;  // cashback 2: R$4,47 (ativo após pedido 9)
+ // Prêmios
+ if(premioHamburguerPendente) d+=17.90;  // hambúrguer grátis — 7º pedido
+ if(premioComboPendente) d+=26.90;       // combo soberano grátis — 12º pedido
  if(premioHamburguerPendente)d+=17.90;
  if(premioComboPendente)d+=26.90;
  return Math.min(d,sub);
