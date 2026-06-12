@@ -540,7 +540,7 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 </div>
 <div class="toast" id="toast"></div>
 <div class="tracking-modal" id="trackingModal"><div class="tracking-card"><h3> Acompanhe seu pedido</h3><p>Confirme o pagamento para registrar na Jornada.</p><div class="tracking-id" id="trackingOrderId"></div><div class="track-steps" id="trackingSteps"></div><div class="track-actions"><button id="confirmarPagamentoBtn"> Confirmar Pagamento</button><button class="sec" onclick="fecharTracking()">Fechar</button></div></div></div>
-<button onclick="resetApp()" style="position:fixed;bottom:130px;right:12px;z-index:999;background:rgba(255,0,0,.15);border:1px solid rgba(255,0,0,.3);color:rgba(255,100,100,.7);font-size:.6rem;font-weight:700;padding:5px 10px;border-radius:20px;cursor:pointer">↺ RESET</button>
+
 
 <script>
 
@@ -734,10 +734,16 @@ function getDescontoAutomatico(){
    let d=0;
    if(_diaAniv) d+=11.90;                              // 🎂 Aniversário: R$11,90 fixo
    if(_dataEsp&&cromiAcumulado>0){
+     // Verifica se CROMI especial já foi usado hoje
+     const _hoje=`${_hj.getFullYear()}-${_hj.getMonth()}-${_hj.getDate()}`;
+     const _chaveUso=`omi_cromi_esp_${clienteWhats}_${_hoje}`;
+     let _jaUsado=false;
+     try{ _jaUsado=!!localStorage.getItem(_chaveUso); }catch(e){}
+     if(_jaUsado) return Math.min(d,sub); // já usou hoje — sem desconto
      d+=cromiAcumulado; // 🎉 Data especial: CROMI aplicado
+     window._cromiEspecialAplicado=true;
      // Zeragem baseada na posição do ciclo Coroa (cada ciclo = 7 pedidos)
-     // Posição 1–4 no ciclo: mantém | Posição 5–7: zera
-     const _cicloPos=((totalPedidosPagos-12)%7)+1; // 1–7 dentro do ciclo Coroa
+     const _cicloPos=((totalPedidosPagos-12)%7)+1;
      if(_cicloPos>=5) window._cromiZeraAposEntrega=true;
    }
    else if(!_diaAniv&&cromiAcumulado>=11.89) d+=11.90; // cashback normal membro — ciclo automático
@@ -1304,7 +1310,7 @@ async function encaminharPedidoFinal(canal){
       }).catch(()=>{});
     }
   }
-  // Zera CROMI se dobro foi usado em data especial a partir do 5º pedido
+  // Zera CROMI se usado em data especial a partir do 5º pedido
   if(window._cromiZeraAposEntrega&&clienteWhats){
     window._cromiZeraAposEntrega=false;
     cromiAcumulado=0;
@@ -1313,6 +1319,13 @@ async function encaminharPedidoFinal(canal){
       headers:SHJ(),
       body:JSON.stringify({cromi_acumulado:0,cromi_zerar_apos_entrega:false})
     }).catch(()=>{});
+  }
+  // Marcar CROMI especial como usado hoje (uso único por dia)
+  if(window._cromiEspecialAplicado&&clienteWhats){
+    window._cromiEspecialAplicado=false;
+    const _hj=new Date();
+    const _ch=`omi_cromi_esp_${clienteWhats}_${_hj.getFullYear()}-${_hj.getMonth()}-${_hj.getDate()}`;
+    try{ localStorage.setItem(_ch,'1'); }catch(e){}
   }
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
   orders.unshift({data:new Date().toISOString(),itens:JSON.parse(p.itens||'[]'),status:'recebido',pagamentoConfirmado:false,avaliado:false});
@@ -1446,7 +1459,7 @@ async function finalizarPedido(){
       }).catch(()=>{});
     }
   }
-  // Zera CROMI se dobro foi usado em data especial a partir do 5º pedido
+  // Zera CROMI se usado em data especial a partir do 5º pedido
   if(window._cromiZeraAposEntrega&&clienteWhats){
     window._cromiZeraAposEntrega=false;
     cromiAcumulado=0;
@@ -1456,6 +1469,13 @@ async function finalizarPedido(){
       headers:SHJ(),
       body:JSON.stringify({cromi_acumulado:0})
     }).catch(()=>{});
+  }
+  // Marcar CROMI especial como usado hoje (uso único por dia)
+  if(window._cromiEspecialAplicado&&clienteWhats){
+    window._cromiEspecialAplicado=false;
+    const _hj=new Date();
+    const _ch=`omi_cromi_esp_${clienteWhats}_${_hj.getFullYear()}-${_hj.getMonth()}-${_hj.getDate()}`;
+    try{ localStorage.setItem(_ch,'1'); }catch(e){}
   }
   // Não chama supaSave() — fidelidade é escrita só pela operação no ENTREGUE.
   salvar();
@@ -2779,7 +2799,7 @@ function copiarCodigo(){
   else{showToast(code);}
 }
 
-function resetApp(){if(!confirm('Resetar todo o progresso?'))return;['dohnmi_v12','dohnmi_orders'].forEach(k=>localStorage.removeItem(k));location.reload();}
+
 function init(){carregar();
   // Auto-sync from Supabase if we have a saved WhatsApp
   if(clienteWhats){
