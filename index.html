@@ -734,11 +734,13 @@ function getDescontoAutomatico(){
    let d=0;
    if(_diaAniv) d+=11.90;                              // 🎂 Aniversário: R$11,90 fixo
    if(_dataEsp&&cromiAcumulado>0){
-     d+=cromiAcumulado*2; // 🎉 Data especial: CROMI × 2
-     // Regra de zeragem: pedidos 1–4 não zeram, 5+ zeram
-     if(totalPedidosPagos>=5) window._cromiDobroZeraAposEntrega=true;
+     d+=cromiAcumulado; // 🎉 Data especial: CROMI aplicado
+     // Zeragem baseada na posição do ciclo Coroa (cada ciclo = 7 pedidos)
+     // Posição 1–4 no ciclo: mantém | Posição 5–7: zera
+     const _cicloPos=((totalPedidosPagos-12)%7)+1; // 1–7 dentro do ciclo Coroa
+     if(_cicloPos>=5) window._cromiZeraAposEntrega=true;
    }
-   else if(!_diaAniv&&cromiAcumulado>=11.89) d+=11.90; // cashback normal membro
+   else if(!_diaAniv&&cromiAcumulado>=11.89) d+=11.90; // cashback normal membro — ciclo automático
    return Math.min(d,sub);
  }
  // Jornada — sem bônus de datas especiais
@@ -841,15 +843,15 @@ function getSaudacaoDataEspecial(){
   }}
 
   // Namorados
-  if(_dia===12&&_mes===6) return `💑 Hoje é Dia dos Namorados. 👑 Seu CROMI vale em dobro. Aproveite. ❤️`;
+  if(_dia===12&&_mes===6) return `💑 Hoje é Dia dos Namorados. 👑 Seu CROMI será aplicado hoje. Aproveite. ❤️`;
   // Crianças
-  if(_dia===12&&_mes===10) return `👶 Hoje é Dia das Crianças. 👑 Seu CROMI vale em dobro. Aproveite. 🎉`;
+  if(_dia===12&&_mes===10) return `👶 Hoje é Dia das Crianças. 👑 Seu CROMI será aplicado hoje. Aproveite. 🎉`;
   // Mães
   if(_mes===5&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),4,i).getDay()===0)c++;}
-    if(c===2) return `👩 Hoje é Dia das Mães. 👑 Seu CROMI vale em dobro. Aproveite. 🌷`;}
+    if(c===2) return `👩 Hoje é Dia das Mães. 👑 Seu CROMI será aplicado hoje. Aproveite. 🌷`;}
   // Pais
   if(_mes===8&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),7,i).getDay()===0)c++;}
-    if(c===2) return `👨 Hoje é Dia dos Pais. 👑 Seu CROMI vale em dobro. Aproveite. 🏆`;}
+    if(c===2) return `👨 Hoje é Dia dos Pais. 👑 Seu CROMI será aplicado hoje. Aproveite. 🏆`;}
   return '';
 }
 
@@ -865,7 +867,11 @@ function getDescontoLabel(curto=false){
   if(premioHamburguerPendente) return curto?'🍔 Hambúrguer grátis':'🍔 Hambúrguer grátis';
   if(premioComboPendente)      return curto?'🎁 Combo grátis':'🎁 Combo grátis';
   if(_diaAniv)                 return curto?'🎂 Bônus Aniversário':'🎂 Bônus Aniversário R$11,90';
-  if(_dataEsp&&cromiAcumulado>0) return curto?`✨ CROMI ×2 — ${_nomeData}`:`✨ CROMI ×2 — ${_nomeData} (R$ ${(cromiAcumulado*2).toFixed(2).replace('.',',')})`;
+  if(_dataEsp&&cromiAcumulado>0){
+    const _cicloPos=((totalPedidosPagos-12)%7)+1;
+    const _zeraLabel=_cicloPos>=5?' · saldo zerado':'';
+    return curto?`✨ CROMI — ${_nomeData}`:`✨ CROMI — ${_nomeData}${_zeraLabel} (R$ ${cromiAcumulado.toFixed(2).replace('.',',')})`;
+  }
   return curto?'💰 Cashback ativo':'💰 Cashback CROMI';
 }
 function renderDrawer(){
@@ -977,16 +983,16 @@ async function finalizarPedidoOMI(){
   // Monta itens do pedido
   const itensLinha = snap.map(i=>`• ${i.qty}× ${i.nome}${i.sub?' ('+i.sub+')':''} — ${fmtVal(i.preco*i.qty)}`).join('\n');
 
-  // Monta valores — breakdown completo
+  // Monta valores — breakdown formato solicitado
   let valoresLinha = '';
   if(temDesc) valoresLinha += `🎁 Refri 350ml GRÁTIS no seu 1º pedido!\n`;
+  valoresLinha += `Valor: ${fmtVal(sub)}\n`;
+  if(membroCoroa) valoresLinha += `Frete grátis 🛵\n`;
+  else valoresLinha += `Frete: ${fmtVal(1.99)}\n`;
   if(descAuto>0){
     const lbl = getDescontoLabel();
-    valoresLinha += `Valor: ${fmtVal(sub)}\n`;
     valoresLinha += `${lbl}: −${fmtVal(descAuto)}\n`;
   }
-  if(membroCoroa) valoresLinha += `Entrega Grátis 🛵\n`;
-  else valoresLinha += `Taxa de entrega: ${fmtVal(1.99)}\n`;
   valoresLinha += `Total: ${fmtVal(total)}`;
 
   const enderecoLinha = clienteEnd
@@ -1299,8 +1305,8 @@ async function encaminharPedidoFinal(canal){
     }
   }
   // Zera CROMI se dobro foi usado em data especial a partir do 5º pedido
-  if(window._cromiDobroZeraAposEntrega&&clienteWhats){
-    window._cromiDobroZeraAposEntrega=false;
+  if(window._cromiZeraAposEntrega&&clienteWhats){
+    window._cromiZeraAposEntrega=false;
     cromiAcumulado=0;
     fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
       method:'PATCH',
@@ -1393,8 +1399,8 @@ async function finalizarPedido(){
       forma_pagamento:'WhatsApp',
       conversa_id:omiConvId||null,
       status:'novo',
-      cromi_dobro_usado:!!(window._cromiDobroZeraAposEntrega||false),
-      cromi_zerado:!!(window._cromiDobroZeraAposEntrega&&totalPedidosPagos>=5),
+      cromi_especial_usado:!!(window._cromiZeraAposEntrega||false),
+      cromi_zerado:!!(window._cromiZeraAposEntrega&&totalPedidosPagos>=5),
       criado_em:new Date().toISOString(),
       atualizado_em:new Date().toISOString()
     };
@@ -1441,8 +1447,8 @@ async function finalizarPedido(){
     }
   }
   // Zera CROMI se dobro foi usado em data especial a partir do 5º pedido
-  if(window._cromiDobroZeraAposEntrega&&clienteWhats){
-    window._cromiDobroZeraAposEntrega=false;
+  if(window._cromiZeraAposEntrega&&clienteWhats){
+    window._cromiZeraAposEntrega=false;
     cromiAcumulado=0;
     salvar();
     fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(clienteWhats)}`,{
@@ -1997,40 +2003,40 @@ function omiGetAvisoDataEspecial(){
         msg:d===0
           ? `🎂 Feliz aniversário, ${nome1}! 👑 Hoje, o Império celebra a sua história. Seu presente já está ativo: R$ 11,90 em bônus para tornar este dia ainda mais especial. 🍔`
           : d===1
-          ? `🎂 ${nome1}, amanhã é seu aniversário! Como Membro da Coroa, você ganha R$11,90 de desconto no seu pedido. O Império celebra com você! 👑`
-          : `🎂 ${nome1}, daqui ${d} dias é seu aniversário! Prepare-se — como Membro da Coroa, você recebe R$11,90 de bônus imperial no grande dia. 👑`
+          ? `🎂 ${nome1}, amanhã é seu aniversário! Como Membro da Coroa, você recebe R$11,90 de bônus imperial. O Império celebra com você! 👑`
+          : `🎂 ${nome1}, daqui ${d} dias é seu aniversário! Como Membro da Coroa, você recebe R$11,90 de bônus no grande dia. 👑`
       });
     }
   }
 
   // Datas fixas
   [{dia:12,mes:6,nome:'Dia dos Namorados',emoji:'💑',
-    d0:'💑 Hoje é dia de celebrar os laços que tornam a vida mais especial. 👑 Seu CROMI vale em dobro. Aproveite. ❤️'},
+    d0:'💑 Hoje é Dia dos Namorados. 👑 Seu CROMI será aplicado hoje. Aproveite. ❤️'},
    {dia:12,mes:10,nome:'Dia das Crianças',emoji:'👶',
-    d0:'👶 Hoje é dia de celebrar a alegria dos pequenos momentos. 👑 Seu CROMI vale em dobro. Aproveite. 🎉'}
+    d0:'👶 Hoje é Dia das Crianças. 👑 Seu CROMI será aplicado hoje. Aproveite. 🎉'}
   ].forEach(({dia,mes,nome,emoji,d0})=>{
     const d=diasAte(dia,mes);
     if(d>=0&&d<=3) alertas.push({dias:d,
       msg:d===0?d0
-        :d===1?`${emoji} ${nome1}, amanhã é ${nome}! Seu CROMI acumulado vale o dobro de desconto no pedido de amanhã. Aproveite! 👑`
-        :`${emoji} ${nome1}, daqui ${d} dias é ${nome}! Seu CROMI acumulado valerá o dobro — uma recompensa imperial para a data. 👑`
+        :d===1?`${emoji} ${nome1}, amanhã é ${nome}! Seu CROMI acumulado será aplicado amanhã. Aproveite! 👑`
+        :`${emoji} ${nome1}, daqui ${d} dias é ${nome}! Seu CROMI acumulado será aplicado na data. 👑`
     });
   });
 
   // Mães
   const maes=nthSunday(5,2);
   if(maes){const d=diasAte(maes.dia,maes.mes);if(d>=0&&d<=3) alertas.push({dias:d,
-    msg:d===0?'👩 Hoje é dia de reconhecer o amor e o cuidado que transformam vidas. 👑 Seu CROMI vale em dobro. Aproveite. 🌷'
-      :d===1?`👩 ${nome1}, amanhã é Dia das Mães! Seu CROMI vale o dobro amanhã. Um presente do Império para a data mais especial. 👑`
-      :`👩 ${nome1}, daqui ${d} dias é Dia das Mães! Seu CROMI acumulado valerá o dobro — celebre com desconto imperial. 👑`
+    msg:d===0?'👩 Hoje é Dia das Mães. 👑 Seu CROMI será aplicado hoje. Aproveite. 🌷'
+      :d===1?`👩 ${nome1}, amanhã é Dia das Mães! Seu CROMI será aplicado amanhã. Um presente do Império. 👑`
+      :`👩 ${nome1}, daqui ${d} dias é Dia das Mães! Seu CROMI será aplicado na data. 👑`
   });}
 
   // Pais
   const pais=nthSunday(8,2);
   if(pais){const d=diasAte(pais.dia,pais.mes);if(d>=0&&d<=3) alertas.push({dias:d,
-    msg:d===0?'👨 Hoje é dia de celebrar os exemplos e os laços que deixam marcas para sempre. 👑 Seu CROMI vale em dobro. Aproveite. 🏆'
-      :d===1?`👨 ${nome1}, amanhã é Dia dos Pais! Seu CROMI vale o dobro amanhã. O Império honra a data. 👑`
-      :`👨 ${nome1}, daqui ${d} dias é Dia dos Pais! Seu CROMI acumulado valerá o dobro — um bônus imperial para a data. 👑`
+    msg:d===0?'👨 Hoje é Dia dos Pais. 👑 Seu CROMI será aplicado hoje. Aproveite. 🏆'
+      :d===1?`👨 ${nome1}, amanhã é Dia dos Pais! Seu CROMI será aplicado amanhã. O Império honra a data. 👑`
+      :`👨 ${nome1}, daqui ${d} dias é Dia dos Pais! Seu CROMI será aplicado na data. 👑`
   });}
 
   if(!alertas.length) return null;
