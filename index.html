@@ -473,16 +473,16 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;back
 
 .omi-bubble-especial{
   font-family:'Cormorant Garamond',serif!important;
-  font-size:1.18rem!important;
+  font-size:1.0rem!important;
   font-weight:800!important;
-  line-height:1.55!important;
+  line-height:1.5!important;
   letter-spacing:.02em!important;
   color:var(--gold)!important;
   background:linear-gradient(135deg,rgba(242,193,46,.11),rgba(242,193,46,.05))!important;
   border:1px solid rgba(242,193,46,.28)!important;
   border-left:3px solid var(--gold)!important;
   border-radius:14px!important;
-  padding:16px 18px!important;
+  padding:14px 16px!important;
   text-shadow:0 1px 8px rgba(242,193,46,.18)!important;
   box-shadow:0 4px 18px rgba(242,193,46,.08)!important;
 }
@@ -837,19 +837,19 @@ function getSaudacaoDataEspecial(){
 
   // Aniversário
   if(clienteAniv){const p=clienteAniv.split('/');if(p.length>=2&&_hj.getDate()===parseInt(p[0])&&_mes===parseInt(p[1])){
-    return `🎂 Feliz aniversário, ${nome1}! 👑 Hoje, o Império celebra a sua história. Seu presente já está ativo: R$ 11,90 em bônus para tornar este dia ainda mais especial. 🍔`;
+    return `🎂 Feliz aniversário, ${nome1}! 👑 O Império celebra a sua história. Bônus de R$ 11,90 ativo hoje. 🍔`;
   }}
 
   // Namorados
-  if(_dia===12&&_mes===6) return `💑 Hoje é dia de celebrar os laços que tornam a vida mais especial. 👑 Seu CROMI vale em dobro. Aproveite. ❤️`;
+  if(_dia===12&&_mes===6) return `💑 Hoje é Dia dos Namorados. 👑 Seu CROMI vale em dobro. Aproveite. ❤️`;
   // Crianças
-  if(_dia===12&&_mes===10) return `👶 Hoje é dia de celebrar a alegria dos pequenos momentos. 👑 Seu CROMI vale em dobro. Aproveite. 🎉`;
+  if(_dia===12&&_mes===10) return `👶 Hoje é Dia das Crianças. 👑 Seu CROMI vale em dobro. Aproveite. 🎉`;
   // Mães
   if(_mes===5&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),4,i).getDay()===0)c++;}
-    if(c===2) return `👩 Hoje é dia de reconhecer o amor e o cuidado que transformam vidas. 👑 Seu CROMI vale em dobro. Aproveite. 🌷`;}
+    if(c===2) return `👩 Hoje é Dia das Mães. 👑 Seu CROMI vale em dobro. Aproveite. 🌷`;}
   // Pais
   if(_mes===8&&_dow===0){let c=0;for(let i=1;i<=_dia;i++){if(new Date(_hj.getFullYear(),7,i).getDay()===0)c++;}
-    if(c===2) return `👨 Hoje é dia de celebrar os exemplos e os laços que deixam marcas para sempre. 👑 Seu CROMI vale em dobro. Aproveite. 🏆`;}
+    if(c===2) return `👨 Hoje é Dia dos Pais. 👑 Seu CROMI vale em dobro. Aproveite. 🏆`;}
   return '';
 }
 
@@ -1249,7 +1249,7 @@ async function encaminharPedidoFinal(canal){
       criado_em: new Date().toISOString(),
       atualizado_em: new Date().toISOString()
     };
-    const _H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+    const _H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation','x-cliente-whats':clienteWhats||''};
     let r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{method:'POST',headers:_H,body:JSON.stringify(payload)});
     // Resiliência: se a coluna 'observacao' ainda não existe na tabela, reenvia sem ela
     if(!r.ok){
@@ -1400,7 +1400,7 @@ async function finalizarPedido(){
     };
     const r=await fetch(`${SUPA_URL}/rest/v1/omi_pedidos`,{
       method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation','x-cliente-whats':clienteWhats||''},
       body:JSON.stringify(payload)
     });
     if(r.ok){
@@ -1958,7 +1958,7 @@ async function garantirConversa(){
     // Cria nova conversa
     const r2=await fetch(`${SUPA_URL}/rest/v1/omi_conversas`,{
       method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation','x-cliente-whats':clienteWhats||''},
       body:JSON.stringify({cliente_whats:clienteWhats,cliente_nome:clienteNome,ultima_msg:'',nao_lidas:0})
     });
     const nova=await r2.json();
