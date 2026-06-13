@@ -979,7 +979,7 @@ async function finalizarPedidoOMI(){
   } else if(membroCoroa){
     saudacao = `Oi, ${periodo} ${nome1}! Que bom te ver de volta. Vou te auxiliar por aqui.`;
   } else if(faltamSelos===1){
-    saudacao = `Oi, ${periodo} ${nome1}! Falta 1 selo para o seu hambúrguer grátis. Vamos lá!`;
+    saudacao = `Oi, ${periodo} ${nome1}! Mais 1 pedido para o seu hambúrguer grátis. Vamos lá!`;
   } else if(favorito && nomeFav[favorito] && snap.some(i=>i.id===favorito)){
     saudacao = `Oi, ${periodo} ${nome1}! Boa escolha trazer o ${nomeFav[favorito]} de volta.`;
   } else if(totalPedidosPagos>0){
@@ -1608,8 +1608,8 @@ function buildOMIContext() {
   if (omiActiveOrderId && omiActiveOrderStatus) {
     const statusTxt = {
       novo:'AGUARDANDO a operação aceitar (ainda não conta na Jornada, sem CROMI ainda)',
-      em_preparo:'ACEITO e em preparo (ainda não entregue — CROMI/selo só ao entregar)',
-      saiu:'SAIU para entrega (ainda não entregue — CROMI/selo só ao entregar)',
+      em_preparo:'ACEITO e em preparo (ainda não entregue — CROMI/prêmio só ao entregar)',
+      saiu:'SAIU para entrega (ainda não entregue — CROMI/prêmio só ao entregar)',
       entregue:'ENTREGUE (já creditado na Jornada)'
     }[omiActiveOrderStatus] || omiActiveOrderStatus;
     ctx += `\n\nPEDIDO EM ANDAMENTO: ${statusTxt}.`;
@@ -1676,10 +1676,10 @@ FASE 3 — MEMBRO DA COROA (vitalício):
 FLUXO DO PEDIDO (MUITO IMPORTANTE)
 1. O cidadão monta o decreto e encaminha → o pedido fica AGUARDANDO a operação aceitar.
 2. A operação ACEITA ou RECUSA. Só depois de aceito o pedido entra em PREPARO → SAIU → ENTREGUE.
-3. CROMI, cashback, prêmios, selos e a contagem da Jornada (pedido X/12) só são creditados QUANDO A OPERAÇÃO MARCA ENTREGUE — nunca antes.
-- Por isso, ao confirmar o envio, NUNCA diga que o cidadão "já ganhou" CROMI, selo, prêmio ou que o pedido já conta na Jornada.
+3. CROMI, cashback e prêmios só são creditados QUANDO A OPERAÇÃO MARCA ENTREGUE — nunca antes.
+- Por isso, ao confirmar o envio, NUNCA diga que o cidadão "já ganhou" CROMI, prêmio ou que o pedido já conta na Jornada.
 - Enquanto o pedido não foi entregue, fale no futuro: "ao ser entregue, você acumula...", "assim que chegar, conta na sua Jornada".
-- Só fale de CROMI/selo/prêmio creditado quando o cidadão já tiver a entrega concluída.
+- Só fale de CROMI/prêmio creditado quando o cidadão já tiver a entrega concluída.
 
 ${buildOMIContext()}
 
@@ -2243,7 +2243,7 @@ function respostaLocalOMI(msgRaw){
 
   // ── Saudação ──
   if(tem('oi','ola','opa','eai','e ai','bom dia','boa tarde','boa noite','salve')){
-    return {txt:`Saudações, ${nome1}! Sou o O-Mi Wave, guardião do Império DOHN'MI. Posso te mostrar o cardápio, seus selos, seu CROMI ou ajudar a montar seu decreto. O que deseja?`, expr:'feliz'};
+    return {txt:`Saudações, ${nome1}! Sou o O-Mi Wave, guardião do Império DOHN'MI. Posso te mostrar o cardápio, seu CROMI ou ajudar a montar seu decreto. O que deseja?`, expr:'feliz'};
   }
 
   // ── "O de sempre" / favorito ──
@@ -2269,11 +2269,11 @@ function respostaLocalOMI(msgRaw){
   }
 
   // ── Selos / jornada / progresso ──
-  if(tem('selo','jornada','progresso','quantos pedidos','quanto falta','coroa','membro')){
-    if(membroCoroa) return {txt:`Você é Membro da Coroa, ${nome1}! Entrega grátis sempre, CROMI turbinado e bônus de aniversário. O Império é seu.`, expr:'feliz'};
+  if(tem('jornada','progresso','quantos pedidos','quanto falta','coroa','membro')){
+    if(membroCoroa) return {txt:`Você é Membro da Coroa, ${nome1}! Entrega grátis sempre, CROMI turbinado e bônus exclusivos. O Império é seu.`, expr:'feliz'};
     const feitos=totalPedidosPagos;
     const faltam=Math.max(0,12-feitos);
-    return {txt:`Você está no pedido ${feitos+1} de 12 da sua jornada, ${nome1}. Faltam ${faltam} para virar Membro da Coroa (com combo grátis no 12º!).`, expr:'atento'};
+    return {txt:`Você está no pedido ${feitos+1} de 12 da sua jornada, ${nome1}. Faltam ${faltam} para virar Membro da Coroa!`, expr:'atento'};
   }
 
   // ── Cardápio geral ──
@@ -2419,7 +2419,7 @@ async function omiChatSend() {
 
   } catch(e) {
     const nome1=(clienteNome||'').split(' ')[0]||'cidadão';
-    omiChatMessages.push({role:'assistant', content:`${nome1}, pra esse pedido específico o melhor é montar direto na tela — é só tocar nos itens. Posso te mostrar o cardápio, seus selos ou seu CROMI. Sobre o que quer saber?`, expr:'atento'});
+    omiChatMessages.push({role:'assistant', content:`${nome1}, pra esse pedido específico o melhor é montar direto na tela — é só tocar nos itens. Posso te mostrar o cardápio ou seu CROMI. Sobre o que quer saber?`, expr:'atento'});
   } finally {
     omiChatLoading = false;
     renderOMIChatMessages();
