@@ -978,7 +978,7 @@ async function finalizarPedidoOMI(){
     saudacao = `Oi, ${periodo} ${nome1}! Vou te auxiliar por aqui — recomendo o O-Mi Wave para uma melhor experiência.`;
   } else if(membroCoroa){
     saudacao = `Oi, ${periodo} ${nome1}! Que bom te ver de volta. Vou te auxiliar por aqui.`;
-  } else if(faltamSelos===1){
+  } else if(totalPedidosPagos===5){
     saudacao = `Oi, ${periodo} ${nome1}! Mais 1 pedido para o seu hambúrguer grátis. Vamos lá!`;
   } else if(favorito && nomeFav[favorito] && snap.some(i=>i.id===favorito)){
     saudacao = `Oi, ${periodo} ${nome1}! Boa escolha trazer o ${nomeFav[favorito]} de volta.`;
@@ -1582,7 +1582,7 @@ function buildOMIContext() {
   let ctx = `CARDÁPIO OFICIAL DOHN'MI\nHAMBÚRGUERES (todos Simples R$17,90 / Duplo R$23,90): REAL · NOBRE · IMPERADOR · SUPREMO · PARAÍSO · ALTEZA\nMOLHOS R$0,99 (50ml): REAL·COROA·ALTEZA·TROPICAL\nCROCANTÍSSIMOS: 6 tiras R$17,90 · 12 tiras R$23,90\nBATATAS: 150g R$12,90 · 300g R$17,90\nCOMBOS: SOBERANO R$26,90 · MONARCA R$39,90 · IMPÉRIO R$49,90 · DAME R$22,90\n\n`;
 
   if (nome1) {
-    ctx += `CIDADÃO IDENTIFICADO:\n- Nome: ${nome1}\n- Total de pedidos: ${totalPedidosPagos}\n- CROMI acumulado: R$ ${cromiAcumulado.toFixed(2)}\n- Selos: ${selosAtivos}/7\n- Status: ${membroCoroa ? 'MEMBRO DA COROA' : `${7-selosAtivos} selos para hambúrguer grátis`}\n`;
+    ctx += `CIDADÃO IDENTIFICADO:\n- Nome: ${nome1}\n- Total de pedidos: ${totalPedidosPagos}\n- CROMI acumulado: R$ ${cromiAcumulado.toFixed(2)}\n- Pedidos na jornada: ${totalPedidosPagos}/12\n- Status: ${membroCoroa ? 'MEMBRO DA COROA' : `Pedido ${totalPedidosPagos} de 12 — faltam ${12-totalPedidosPagos} para Membro da Coroa`}\n`;
     if (clienteAniv) ctx += `- Aniversário: ${clienteAniv}\n`;
     if (clienteEnd) ctx += `- Endereço: ${clienteEnd}\n`;
     if (favorito && nomeFav[favorito]) ctx += `- Favorito histórico: ${nomeFav[favorito]}\n`;
