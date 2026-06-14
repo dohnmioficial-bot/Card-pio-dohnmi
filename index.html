@@ -29,9 +29,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 40% at 50% -10%,rgba(242,193,46,.07) 0%,transparent 60%)}
 
 /* HERO */
-.hero{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;padding:22px 20px 6px}
+.hero{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;padding:17px 20px 6px}
 .hero img.logo{display:block;width:min(270px,74vw);height:auto;filter:drop-shadow(0 0 24px rgba(242,193,46,.45))}
-.hero-bar{display:flex;align-items:center;gap:8px;margin:8px auto 0;background:linear-gradient(120deg,rgba(242,193,46,.04),rgba(242,193,46,.1),rgba(242,193,46,.04));border:1px solid rgba(242,193,46,.22);border-radius:30px;padding:6px 16px;font-size:.65rem;font-weight:700;color:rgba(242,193,46,.82);letter-spacing:.08em;text-shadow:0 0 8px rgba(242,193,46,.25);box-shadow:0 0 14px rgba(242,193,46,.06),inset 0 1px 0 rgba(255,255,255,.04)}
+.hero-bar{display:flex;align-items:center;gap:8px;margin:2px auto 0;background:linear-gradient(120deg,rgba(242,193,46,.04),rgba(242,193,46,.1),rgba(242,193,46,.04));border:1px solid rgba(242,193,46,.22);border-radius:30px;padding:6px 16px;font-size:.65rem;font-weight:700;color:rgba(242,193,46,.82);letter-spacing:.08em;text-shadow:0 0 8px rgba(242,193,46,.25);box-shadow:0 0 14px rgba(242,193,46,.06),inset 0 1px 0 rgba(255,255,255,.04)}
 .hero-bar-dot{width:5px;height:5px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,.8);animation:heroDotPulse 2.4s ease-in-out infinite}
 .hero-bar-dot:nth-of-type(2){animation-delay:.8s}
 .hero-bar-dot:nth-of-type(3){animation-delay:1.6s}
@@ -890,7 +890,7 @@ function renderDrawer(){
  if(temDesc)html+=`<div class="drawer-row desc-row"><span>🎁 Refri 350ml grátis (1º pedido)</span><span>GRÁTIS</span></div>`;
  if(descAuto>0){const _hjD=new Date(),_anivD=clienteAniv?((_hjD.getDate()===parseInt((clienteAniv.split('/')||[])[0]))&&((_hjD.getMonth()+1)===parseInt((clienteAniv.split('/')||[])[1]))):false;
 const lbl=getDescontoLabel();html+=`<div class="cashback-box"><div class="cashback-label">${lbl}</div><div class="cashback-calc">${fmtVal(sub)} − ${fmtVal(descAuto)}</div></div>`;}
- if(!membroCoroa)html+=`<div class="drawer-row"><span> Taxa de entrega</span><span>R$ 1,99</span></div>`;
+ if(!membroCoroa)html+=`<div class="drawer-row"><span> Entrega</span><span>R$ 1,99</span></div>`;
  html+=`<div class="total-box" style="gap:8px"><div class="sh-icon ic-scroll" style="width:28px;height:28px;flex-shrink:0"></div><div class="total-label">TOTAL</div><div class="total-val">${fmtVal(total)}</div></div>`;
  html+=`<div class="split-bar">
   <button class="btn-omi-split" onclick="finalizarPedidoOMI()">
@@ -993,8 +993,8 @@ async function finalizarPedidoOMI(){
   let valoresLinha = '';
   if(temDesc) valoresLinha += `🎁 Refri 350ml GRÁTIS no seu 1º pedido!\n`;
   valoresLinha += `Valor: ${fmtVal(sub)}\n`;
-  if(membroCoroa) valoresLinha += `Frete grátis 🛵\n`;
-  else valoresLinha += `Frete: ${fmtVal(1.99)}\n`;
+  if(membroCoroa) valoresLinha += `Entrega grátis 🛵\n`;
+  else valoresLinha += `Entrega: ${fmtVal(1.99)}\n`;
   if(descAuto>0){
     const lbl = getDescontoLabel();
     valoresLinha += `${lbl}: −${fmtVal(descAuto)}\n`;
@@ -1443,7 +1443,7 @@ async function finalizarPedido(){
     var lblWa=getDescontoLabel(true);
     valoresLinha+=lblWa+': -'+fmtV(descAuto)+'\n';
   }
-  valoresLinha+='Taxa de entrega: '+(membroCoroa?'Gratis':fmtV(1.99))+'\nTotal: '+fmtV(total);
+  valoresLinha+='Entrega: '+(membroCoroa?'Gratis':fmtV(1.99))+'\nTotal: '+fmtV(total);
   var msg='*PEDIDO DOHN MI*\n'+clienteEnd+'\n\n'+linhasItens+'\n\n'+valoresLinha;
 // ── 3. Atualiza estado local ──
   const orders=JSON.parse(localStorage.getItem('dohnmi_orders')||'[]');
@@ -1597,7 +1597,7 @@ function buildOMIContext() {
     ctx += `Subtotal: R$ ${sub.toFixed(2).replace('.',',')}`;
     if (temDesc) ctx += ` → com desconto: R$ ${total.toFixed(2).replace('.',',')}`;
     ctx += '\n';
-    if (!membroCoroa) ctx += `Taxa de entrega: R$ 1,99\nTotal final: R$ ${total.toFixed(2).replace('.',',')}\n`;
+    if (!membroCoroa) ctx += `Entrega: R$ 1,99\nTotal final: R$ ${total.toFixed(2).replace('.',',')}\n`;
   } else {
     ctx += `\nSACOLA: Vazia\n`;
   }
@@ -1659,7 +1659,7 @@ SISTEMA DE FIDELIDADE
 FASE 1 — CADASTRO: Refri 350ml grátis no 1º pedido. Uso único.
 
 FASE 2 — JORNADA (12 pedidos):
-- Taxa de entrega: R$1,99 por pedido
+- Entrega: R$1,99 por pedido
 - CROMI +R$1,49 nos pedidos 1, 2, 3, 4, 8, 9, 10
 - Cashback automático no 4º pedido: R$5,96 (creditado ao entregar o 4º)
 - Cashback automático no 10º pedido: R$4,47 (creditado ao entregar o 10º)
