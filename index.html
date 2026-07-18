@@ -550,7 +550,62 @@ const H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
 function SH(){return {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'x-cliente-whats':clienteWhats||''};}
 function SHJ(){return {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal','x-cliente-whats':clienteWhats||''};}
 
+// ── ONZUP ID — LOGIN ÚNICO (Fase 1) ────────────────────
+// Projeto unificado (mesmo backend do Onzup): auth.users + profiles + dohnmi_papiro
+const ONZUP_URL='https://qkpkttifbbdwcjkgyycq.supabase.co';
+const ONZUP_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcGt0dGlmYmJkd2Nqa2d5eWNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MTE2MjQsImV4cCI6MjA5Njk4NzYyNH0.K1I0450b7N7EnOkhiYweUrdL9kuA0gz2Mxf6WpIyNzM';
+let onzupSession=null; // {access_token, refresh_token, user_id}
 
+function carregarSessaoOnzup(){
+  try{const s=JSON.parse(localStorage.getItem('onzup_session')||'null');if(s&&s.access_token)onzupSession=s;}catch(e){}
+}
+function salvarSessaoOnzup(s){onzupSession=s;try{localStorage.setItem('onzup_session',JSON.stringify(s));}catch(e){}}
+
+function formatarTelefoneE164(zapDigits){
+  const d=(zapDigits||'').replace(/\D/g,'');
+  if(!d)return null;
+  return d.startsWith('55')?('+'+d):('+55'+d);
+}
+
+// Envia o código SMS via Supabase Auth (Twilio precisa estar habilitado no projeto Onzup — ver nota)
+async function enviarCodigoOnzup(zapDigits){
+  const phone=formatarTelefoneE164(zapDigits);
+  if(!phone)throw new Error('Telefone inválido');
+  const r=await fetch(`${ONZUP_URL}/auth/v1/otp`,{
+    method:'POST',
+    headers:{'apikey':ONZUP_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({phone,create_user:true})
+  });
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Falha ao enviar SMS: '+t);}
+  return true;
+}
+
+// Confirma o código digitado e abre a sessão (equivalente ao "Conta Onzup ID")
+async function confirmarCodigoOnzup(zapDigits,codigo){
+  const phone=formatarTelefoneE164(zapDigits);
+  const r=await fetch(`${ONZUP_URL}/auth/v1/verify`,{
+    method:'POST',
+    headers:{'apikey':ONZUP_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({type:'sms',phone,token:codigo})
+  });
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error('Código inválido: '+t);}
+  const data=await r.json();
+  salvarSessaoOnzup({access_token:data.access_token,refresh_token:data.refresh_token,user_id:data.user.id});
+  return data.user.id;
+}
+
+// Garante que existe profiles (tipo=usuario) e dohnmi_papiro pro usuário logado
+async function garantirPerfilOnzup(userId,nome,zapDigits,aniv){
+  const headers={'apikey':ONZUP_KEY,'Authorization':'Bearer '+onzupSession.access_token,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};
+  await fetch(`${ONZUP_URL}/rest/v1/profiles?on_conflict=id`,{
+    method:'POST',headers,
+    body:JSON.stringify([{id:userId,tipo:'usuario',nome,telefone:zapDigits,aniversario:aniv||null}])
+  });
+  await fetch(`${ONZUP_URL}/rest/v1/dohnmi_papiro?on_conflict=user_id`,{
+    method:'POST',headers,
+    body:JSON.stringify([{user_id:userId}])
+  });
+}
 
 // ── SUPABASE SYNC ──────────────────────────────────────
 async function supaLoad(whats){
@@ -2529,7 +2584,12 @@ function htmlCadastro(){
       <input id="inp-end" type="text" placeholder="Rua, número, bairro" maxlength="80" autocomplete="street-address">
       <div class="inp-hint">Para sua entrega chegar sem erro</div>
     </div>
-    <button class="inp-btn" onclick="confirmarCadastro()">Ativar minha Jornada 🚀</button>
+    <div class="inp-group" id="otp-block" style="display:none">
+      <label>Código enviado por SMS</label>
+      <input id="inp-otp" type="text" placeholder="000000" maxlength="6" inputmode="numeric">
+      <div class="inp-hint">Confirma que esse WhatsApp é realmente seu — sua Conta Onzup ID</div>
+    </div>
+    <button class="inp-btn" id="btn-ativar-jornada" onclick="iniciarAtivacaoComOTP()">Ativar minha Jornada 🚀</button>
   </div>`;
 }
 
@@ -2768,7 +2828,52 @@ async function confirmarRetorno(){
 }
 
 function bindForms(){const ni=document.getElementById('inp-nome'),zi=document.getElementById('inp-zap'),ai=document.getElementById('inp-aniv'),ei=document.getElementById('inp-end');if(ni&&clienteNome)ni.value=clienteNome;if(zi&&clienteWhats)zi.value=clienteWhats;if(ai&&clienteAniv)ai.value=clienteAniv;if(ei&&clienteEnd)ei.value=clienteEnd;if(zi)zi.addEventListener('input',e=>{e.target.value=formatarZap(e.target.value.replace(/\D/g,''));});if(ai)ai.addEventListener('input',e=>{e.target.value=formatarAniv(e.target.value);});}
-async function confirmarCadastro(){const n=(document.getElementById('inp-nome')?.value||'').trim();const z=(document.getElementById('inp-zap')?.value||'').replace(/\D/g,'');if(!n||z.length<10){showToast('Preencha nome e WhatsApp!');return;}clienteNome=n;clienteWhats=z;clienteAniv=document.getElementById('inp-aniv')?.value||'';clienteEnd=document.getElementById('inp-end')?.value||'';const _endDigitado=clienteEnd;const clienteExistente=await supaLoad(clienteWhats);if(clienteExistente&&clienteExistente.aniversario&&clienteAniv&&clienteExistente.aniversario!==clienteAniv){showToast('⚠️ Data de nascimento não confere!');clienteWhats='';return;}if(clienteExistente){await supaLoadCliente();}// Preserva o endereço recém-digitado se o banco não tinha um (ou se o cliente atualizou)
+// ── Orquestra o login único (Onzup ID) antes de ativar a Jornada ──
+let _otpEnviadoPara=null;
+async function iniciarAtivacaoComOTP(){
+  const btn=document.getElementById('btn-ativar-jornada');
+  const n=(document.getElementById('inp-nome')?.value||'').trim();
+  const z=(document.getElementById('inp-zap')?.value||'').replace(/\D/g,'');
+  if(!n||z.length<10){showToast('Preencha nome e WhatsApp!');return;}
+
+  if(_otpEnviadoPara!==z){
+    // Passo 1: dispara o SMS
+    btn.disabled=true;btn.textContent='Enviando código...';
+    try{
+      await enviarCodigoOnzup(z);
+      _otpEnviadoPara=z;
+      document.getElementById('otp-block').style.display='block';
+      btn.textContent='Confirmar código ✓';
+      showToast('Código enviado por SMS pro seu WhatsApp/celular');
+    }catch(e){
+      showToast('Não consegui enviar o código. Tente novamente.');
+    }
+    btn.disabled=false;
+    return;
+  }
+
+  // Passo 2: confirma o código e só então ativa a jornada (fluxo legado intacto)
+  const codigo=(document.getElementById('inp-otp')?.value||'').trim();
+  if(codigo.length<4){showToast('Digite o código recebido');return;}
+  btn.disabled=true;btn.textContent='Confirmando...';
+  try{
+    const aniv=document.getElementById('inp-aniv')?.value||'';
+    const userId=await confirmarCodigoOnzup(z,codigo);
+    await garantirPerfilOnzup(userId,n,z,converterAnivParaISO(aniv));
+    await confirmarCadastroLegado();
+  }catch(e){
+    showToast('Código incorreto ou expirado.');
+    btn.disabled=false;btn.textContent='Confirmar código ✓';
+  }
+}
+function converterAnivParaISO(aniv){
+  // aniv vem como DD/MM — não temos o ano no cadastro atual, então guarda só dia/mês válido, ano placeholder 1900
+  const p=(aniv||'').split('/');
+  if(p.length<2||!p[0]||!p[1])return null;
+  return `1900-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+}
+
+async function confirmarCadastroLegado(){const n=(document.getElementById('inp-nome')?.value||'').trim();const z=(document.getElementById('inp-zap')?.value||'').replace(/\D/g,'');if(!n||z.length<10){showToast('Preencha nome e WhatsApp!');return;}clienteNome=n;clienteWhats=z;clienteAniv=document.getElementById('inp-aniv')?.value||'';clienteEnd=document.getElementById('inp-end')?.value||'';const _endDigitado=clienteEnd;const clienteExistente=await supaLoad(clienteWhats);if(clienteExistente&&clienteExistente.aniversario&&clienteAniv&&clienteExistente.aniversario!==clienteAniv){showToast('⚠️ Data de nascimento não confere!');clienteWhats='';return;}if(clienteExistente){await supaLoadCliente();}// Preserva o endereço recém-digitado se o banco não tinha um (ou se o cliente atualizou)
 if(_endDigitado){clienteEnd=_endDigitado;}
 const _pedidosAnteriores=(clienteExistente?.total_pedidos||0);
 descontoAtivo=(_pedidosAnteriores===0);
@@ -2800,7 +2905,7 @@ function copiarCodigo(){
 }
 
 
-function init(){carregar();
+function init(){carregar();carregarSessaoOnzup();
   // Auto-sync from Supabase if we have a saved WhatsApp
   if(clienteWhats){
     supaLoad(clienteWhats).then(d=>{
